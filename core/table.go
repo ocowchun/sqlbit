@@ -1,20 +1,43 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const COLUMN_USERNAME_LENGTH = 32
 const COLUMN_EMAIL_LENGTH = 255
 
 type Row struct {
-	ID       int
-	Username [COLUMN_USERNAME_LENGTH]rune
-	Email    [COLUMN_EMAIL_LENGTH]rune
+	id       int
+	username [COLUMN_USERNAME_LENGTH]rune
+	email    [COLUMN_EMAIL_LENGTH]rune
+}
+
+func NewRow(id int, username [COLUMN_USERNAME_LENGTH]rune, email [COLUMN_EMAIL_LENGTH]rune) *Row {
+	return &Row{
+		id:       id,
+		username: username,
+		email:    email,
+	}
+}
+
+func (r *Row) Id() int {
+	return r.id
+}
+
+func (r *Row) Username() string {
+	replacer := strings.NewReplacer("\x00", "")
+	return replacer.Replace(string(r.username[:COLUMN_USERNAME_LENGTH]))
+}
+
+func (r *Row) Email() string {
+	replacer := strings.NewReplacer("\x00", "")
+	return replacer.Replace(string(r.email[:COLUMN_EMAIL_LENGTH]))
 }
 
 func (r *Row) String() string {
-	username := string(r.Username[:COLUMN_USERNAME_LENGTH])
-	email := string(r.Email[:COLUMN_EMAIL_LENGTH])
-	return fmt.Sprintf("(%d, %s,%s)", r.ID, username, email)
+	return fmt.Sprintf("(%d, %s,%s)", r.Id(), r.Username(), r.Email())
 }
 
 const PAGE_SIZE = 4096

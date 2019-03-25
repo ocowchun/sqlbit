@@ -33,7 +33,7 @@ func extractUserFromTokens(tokens []string) (Statement, error) {
 	var email [core.COLUMN_EMAIL_LENGTH]rune
 	copy(email[:], []rune(tokens[emailIdx]))
 
-	row := &core.Row{ID: userID, Username: username, Email: email}
+	row := core.NewRow(userID, username, email)
 	return Statement{StatementType_Insert, row}, nil
 }
 

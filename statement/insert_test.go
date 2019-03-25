@@ -16,13 +16,9 @@ func TestPrepareInsert(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, StatementType_Insert, s.Type)
-	assert.Equal(t, 1, s.RowToInsert.ID)
-	var expectedUsername [core.COLUMN_USERNAME_LENGTH]rune
-	copy(expectedUsername[:], []rune("cstack"))
-	assert.Equal(t, expectedUsername, s.RowToInsert.Username)
-	var expectedEmail [core.COLUMN_EMAIL_LENGTH]rune
-	copy(expectedEmail[:], []rune("foo@bar.com"))
-	assert.Equal(t, expectedEmail, s.RowToInsert.Email)
+	assert.Equal(t, 1, s.RowToInsert.Id())
+	assert.Equal(t, "cstack", s.RowToInsert.Username())
+	assert.Equal(t, "foo@bar.com", s.RowToInsert.Email())
 }
 
 func TestPrepareInsert_withSyntaxError(t *testing.T) {
@@ -66,7 +62,7 @@ func TestExecuteInsert(t *testing.T) {
 	var email [core.COLUMN_EMAIL_LENGTH]rune
 	copy(email[:], []rune("harry@hogwarts.edu"))
 	id := 1
-	rowToInsert := &core.Row{ID: id, Username: username, Email: email}
+	rowToInsert := core.NewRow(id, username, email)
 	s := Statement{StatementType_Insert, rowToInsert}
 	table := &core.Table{}
 
@@ -74,7 +70,7 @@ func TestExecuteInsert(t *testing.T) {
 
 	assert.Equal(t, ExecuteResult_Success, result)
 	row := table.Pages()[0].Rows()[0]
-	assert.Equal(t, id, row.ID)
-	assert.Equal(t, username, row.Username)
-	assert.Equal(t, email, row.Email)
+	assert.Equal(t, id, row.Id())
+	assert.Equal(t, "harry", row.Username())
+	assert.Equal(t, "harry@hogwarts.edu", row.Email())
 }
