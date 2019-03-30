@@ -7,11 +7,11 @@ import (
 )
 
 func ExecuteSelect(s Statement, table *core.Table) ExecuteResult {
-	numRows := table.NumRows()
-	for i := 0; i < numRows; i++ {
-		pageIdx := i / core.ROW_PER_PAGE
-		rowIdx := i - pageIdx*core.ROW_PER_PAGE
-		row := table.Pages()[pageIdx].Rows()[rowIdx]
+	rows, err := table.Select()
+	if err != nil {
+		return ExecuteResult_Failure
+	}
+	for _, row := range rows {
 		fmt.Println(row)
 	}
 	return ExecuteResult_Success

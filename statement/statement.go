@@ -21,5 +21,6 @@ type ExecuteResult int
 
 const (
 	ExecuteResult_Success ExecuteResult = iota
+	ExecuteResult_Failure
 	ExecuteResult_TableFull
 )

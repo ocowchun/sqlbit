@@ -16,7 +16,7 @@ func TestPrepareInsert(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, StatementType_Insert, s.Type)
-	assert.Equal(t, 1, s.RowToInsert.Id())
+	assert.Equal(t, uint32(1), s.RowToInsert.Id())
 	assert.Equal(t, "cstack", s.RowToInsert.Username())
 	assert.Equal(t, "foo@bar.com", s.RowToInsert.Email())
 }
@@ -34,7 +34,7 @@ func TestPrepareInsert_withNegativeId(t *testing.T) {
 
 	_, err := PrepareInsert(text)
 
-	assert.Equal(t, "id must be positive", err.Error())
+	assert.Equal(t, "id must be integer", err.Error())
 }
 func TestPrepareInsert_withInvalidDataType(t *testing.T) {
 	text := "insert s cstack foo@bar.com"
@@ -57,11 +57,9 @@ func TestPrepareInsert_withInvalidLength(t *testing.T) {
 }
 
 func TestExecuteInsert(t *testing.T) {
-	var username [core.COLUMN_USERNAME_LENGTH]rune
-	copy(username[:], []rune("harry"))
-	var email [core.COLUMN_EMAIL_LENGTH]rune
-	copy(email[:], []rune("harry@hogwarts.edu"))
-	id := 1
+	id := uint32(2147483647)
+	username := "harry"
+	email := "harry@hogwarts.edu"
 	rowToInsert := core.NewRow(id, username, email)
 	s := Statement{StatementType_Insert, rowToInsert}
 	table := &core.Table{}

@@ -13,7 +13,7 @@ func extractUserFromTokens(tokens []string) (Statement, error) {
 	usernameIdx := 2
 	emailIdx := 3
 
-	userID, err := strconv.Atoi(tokens[idIdx])
+	userID, err := strconv.ParseUint(tokens[idIdx], 10, 32)
 	if err != nil {
 		return Statement{}, errors.New("id must be integer")
 	}
@@ -21,19 +21,17 @@ func extractUserFromTokens(tokens []string) (Statement, error) {
 		return Statement{}, errors.New("id must be positive")
 	}
 
-	if len(tokens[usernameIdx]) > core.COLUMN_USERNAME_LENGTH {
+	username := tokens[usernameIdx]
+	if len(username) > core.COLUMN_USERNAME_LENGTH {
 		return Statement{}, errors.New("username too long")
 	}
-	var username [core.COLUMN_USERNAME_LENGTH]rune
-	copy(username[:], []rune(tokens[usernameIdx]))
 
-	if len(tokens[emailIdx]) > core.COLUMN_EMAIL_LENGTH {
+	email := tokens[emailIdx]
+	if len(email) > core.COLUMN_EMAIL_LENGTH {
 		return Statement{}, errors.New("email too long")
 	}
-	var email [core.COLUMN_EMAIL_LENGTH]rune
-	copy(email[:], []rune(tokens[emailIdx]))
 
-	row := core.NewRow(userID, username, email)
+	row := core.NewRow(uint32(userID), username, email)
 	return Statement{StatementType_Insert, row}, nil
 }
 

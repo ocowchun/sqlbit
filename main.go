@@ -19,9 +19,10 @@ func isMetaCommand(text string) bool {
 	return text[0] == '.'
 }
 
-func runMetaCommand(text string) {
+func runMetaCommand(text string, table *core.Table) {
 	if text == ".exit" {
 		fmt.Println("bye")
+		table.CloseTable()
 		os.Exit(0)
 	} else {
 		fmt.Printf("Unrecognized command %s", text)
@@ -54,13 +55,17 @@ func executeStatement(s statement.Statement, table *core.Table) {
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Welcome to sqlbit 0.0.1\n")
-	table := &core.Table{}
+	table, err := core.OpenTable("/Users/ocowchun/go/src/github.com/ocowchun/sqlbit/tmp/test.db")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	for true {
 		printPrompt()
 		text, _ := reader.ReadString('\n')
 		text = text[:len(text)-1]
 		if isMetaCommand(text) {
-			runMetaCommand(text)
+			runMetaCommand(text, table)
 		} else {
 			statement, err := prepareStatement(text)
 			if err != nil {
