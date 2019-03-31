@@ -74,7 +74,7 @@ func (p *Page) InsertRow(idx int, row *Row) {
 func (p *Page) Bytes() []byte {
 	bs := []byte{}
 	for _, row := range p.rows {
-		if row == nil {
+		if row.id == 0 {
 			break
 		}
 		bs = append(bs, row.Bytes()...)
@@ -97,19 +97,24 @@ func OpenTable(fileName string) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	numRows := fileSize / ROW_SIZE
+	numRows := (fileSize/PAGE_SIZE)*14 + (fileSize%PAGE_SIZE)/ROW_SIZE
 	return &Table{
 		numRows: int(numRows),
 		pager:   pager,
 	}, nil
 }
 
-func (t *Table) CloseTable() {
+func (t *Table) CloseTable() error {
 	for pageNum, page := range t.pager.pages {
 		if page != nil {
-			t.pager.FlushPage(pageNum)
+			err := t.pager.FlushPage(pageNum)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	err := t.pager.file.Close()
+	return err
 }
 
 func (t *Table) InsertRow(row *Row) error {
