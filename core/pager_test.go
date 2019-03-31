@@ -62,7 +62,7 @@ func TestFlushPage(t *testing.T) {
 	pager, _ := OpenPager(fileName)
 	page, err := pager.ReadPage(0)
 	row := fakeRow()
-	page.InsertRow(0, row)
+	page.rows[0] = row
 
 	err = pager.FlushPage(0)
 

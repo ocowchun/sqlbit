@@ -53,6 +53,12 @@ func (r *Row) String() string {
 	return fmt.Sprintf("(%d, %s,%s)", r.Id(), r.Username(), r.Email())
 }
 
+func (r *Row) update(newRow *Row) {
+	r.id = newRow.id
+	r.username = newRow.username
+	r.email = newRow.email
+}
+
 const PAGE_SIZE = 4096
 
 // 4 + 32 + 255
@@ -65,10 +71,6 @@ type Page struct {
 
 func (p *Page) Rows() [ROW_PER_PAGE]*Row {
 	return p.rows
-}
-
-func (p *Page) InsertRow(idx int, row *Row) {
-	p.rows[idx] = row
 }
 
 func (p *Page) Bytes() []byte {
@@ -117,30 +119,36 @@ func (t *Table) CloseTable() error {
 	return err
 }
 
-func (t *Table) InsertRow(row *Row) error {
-	pageNum := t.numRows / ROW_PER_PAGE
+func (t *Table) rowSlot(rowNum int) (*Row, error) {
+	pageNum := rowNum / ROW_PER_PAGE
 	page, err := t.pager.ReadPage(pageNum)
+	if err != nil {
+		return nil, err
+	}
+	return page.rows[rowNum%ROW_PER_PAGE], nil
+}
+
+func (t *Table) InsertRow(newRow *Row) error {
+	c := newCursorFromEnd(t)
+	row, err := c.value()
 	if err != nil {
 		return err
 	}
-
-	rowNum := t.numRows - pageNum*ROW_PER_PAGE
-	page.rows[rowNum] = row
+	row.update(newRow)
 	t.numRows = t.numRows + 1
 	return nil
 }
 
 func (t *Table) Select() ([]*Row, error) {
 	rows := []*Row{}
-	for i := 0; i < t.numRows; i++ {
-		pageNum := i / ROW_PER_PAGE
-		rowIdx := i - pageNum*ROW_PER_PAGE
-		page, err := t.pager.ReadPage(pageNum)
+	c := newCursorFromStart(t)
+	for c.endOfTable != true {
+		row, err := c.value()
 		if err != nil {
 			return nil, err
 		}
-		row := page.Rows()[rowIdx]
 		rows = append(rows, row)
+		c.advance()
 	}
 	return rows, nil
 }
@@ -151,4 +159,48 @@ func (t *Table) NumRows() int {
 
 func (t *Table) Pages() [TABLE_MAX_PAGES]*Page {
 	return t.pages
+}
+
+// Cursor represents a location in the table.
+type Cursor struct {
+	table      *Table
+	rowNum     int
+	endOfTable bool
+}
+
+// * Create a cursor at the beginning of the table
+func newCursorFromStart(table *Table) *Cursor {
+	return &Cursor{
+		table:      table,
+		rowNum:     0,
+		endOfTable: table.numRows == 0,
+	}
+}
+
+// Create a cursor at the end of the table
+func newCursorFromEnd(table *Table) *Cursor {
+	return &Cursor{
+		table:      table,
+		rowNum:     table.numRows,
+		endOfTable: true,
+	}
+}
+
+// Access the row the cursor is pointing to
+func (c *Cursor) value() (*Row, error) {
+	rowNum := c.rowNum
+	pageNum := rowNum / ROW_PER_PAGE
+	page, err := c.table.pager.ReadPage(pageNum)
+	if err != nil {
+		return nil, err
+	}
+	return page.rows[rowNum%ROW_PER_PAGE], nil
+}
+
+// Advance the cursor to the next row
+func (c *Cursor) advance() {
+	c.rowNum = c.rowNum + 1
+	if c.rowNum >= c.table.numRows {
+		c.endOfTable = true
+	}
 }
