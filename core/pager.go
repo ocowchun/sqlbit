@@ -66,14 +66,14 @@ func deserializePage(bytes []byte) *Page {
 	page := &Page{}
 	for i := 0; i < ROW_PER_PAGE; i++ {
 		from := i * ROW_SIZE
-		b := bytes[from : from+ROW_SIZE]
-		if len(b) == 0 {
+		bs := bytes[from : from+ROW_SIZE]
+		if len(bs) == 0 {
 			break
 		}
-		id := binary.LittleEndian.Uint32(b)
+		id := binary.LittleEndian.Uint32(bs)
 		replacer := strings.NewReplacer("\x00", "")
-		usrename := replacer.Replace(string(bytes[4:COLUMN_USERNAME_LENGTH]))
-		email := replacer.Replace(string(bytes[36:COLUMN_EMAIL_LENGTH]))
+		usrename := replacer.Replace(string(bs[4:COLUMN_USERNAME_LENGTH]))
+		email := replacer.Replace(string(bs[36:COLUMN_EMAIL_LENGTH]))
 
 		page.rows[i] = NewRow(id, usrename, email)
 	}
