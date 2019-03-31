@@ -55,7 +55,9 @@ func executeStatement(s statement.Statement, table *core.Table) {
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Welcome to sqlbit 0.0.1\n")
-	table, err := core.OpenTable("/Users/ocowchun/go/src/github.com/ocowchun/sqlbit/tmp/test.db")
+	dir, _ := os.Getwd()
+	fileName := dir + "/tmp/test.db"
+	table, err := core.OpenTable(fileName)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
