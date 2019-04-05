@@ -5,10 +5,111 @@ import (
 	"sort"
 )
 
+type Node interface {
+	ID() uint32
+	SetID(id uint32)
+	Keys() []uint32
+	Children() []uint32
+	String() string
+	NodeType() string
+}
+
+type InternalNode struct {
+	id       uint32
+	keys     []uint32
+	children []uint32
+}
+
+func (n *InternalNode) ID() uint32 {
+	return n.id
+}
+
+func (n *InternalNode) SetID(id uint32) {
+	n.id = id
+}
+
+func (n *InternalNode) Keys() []uint32 {
+	return n.keys
+}
+
+func (n *InternalNode) Children() []uint32 {
+	return n.children
+}
+
+func (n *InternalNode) NodeType() string {
+	return "InternalNode"
+}
+
+func (n *InternalNode) String() string {
+	message := "InternalNode ("
+	keys := n.Keys()
+	for _, key := range keys {
+		message = message + fmt.Sprintf("%v ", key)
+	}
+	message = message + ")"
+	return message
+}
+
+type LeafNode struct {
+	id     uint32
+	tuples []*Tuple
+}
+
+func (n *LeafNode) ID() uint32 {
+	return n.id
+}
+
+func (n *LeafNode) SetID(id uint32) {
+	n.id = id
+}
+
+func (n *LeafNode) Children() []uint32 {
+	return []uint32{}
+}
+
+func (n *LeafNode) Keys() []uint32 {
+	keys := []uint32{}
+	for _, tuple := range n.tuples {
+		keys = append(keys, tuple.key)
+	}
+	return keys
+}
+
+func (n *LeafNode) NodeType() string {
+	return "LeafNode"
+}
+
+func (n *LeafNode) String() string {
+	message := "LeafNode ("
+	keys := n.Keys()
+	for _, key := range keys {
+		message = message + fmt.Sprintf("%v ", key)
+	}
+	message = message + ")"
+	return message
+}
+
+type Tuple struct {
+	key   uint32
+	value []byte
+}
+
+type ByKey []*Tuple
+
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
+
 type BTree struct {
 	rootNode        Node
 	capacityPerNode int
 	nodes           []Node
+	noder           Noder
+}
+
+type Noder interface {
+	Read(nodeId uint32) Node
+	Add(node Node) uint32
 }
 
 func (t *BTree) String() string {
@@ -29,100 +130,17 @@ func (t *BTree) String() string {
 	return message
 }
 
-type Node interface {
-	SetID(id int)
-	Keys() []int
-	Children() []int
-	String() string
-	// perim() float64
+func (t *BTree) getNode(nodeId uint32) Node {
+	return t.noder.Read(nodeId)
 }
 
-type InternalNode struct {
-	id   int
-	keys []int
-	// values   []string
-	// tuples   []*Tuple
-	children []int
+func (t *BTree) addNewNode(node Node) uint32 {
+	return t.noder.Add(node)
 }
 
-func (n *InternalNode) SetID(id int) {
-	n.id = id
-}
-
-func (n *InternalNode) Keys() []int {
-	return n.keys
-}
-
-func (n *InternalNode) Children() []int {
-	return n.children
-}
-
-func (n *InternalNode) String() string {
-	message := "InternalNode ("
-	keys := n.Keys()
-	for _, key := range keys {
-		message = message + fmt.Sprintf("%v ", key)
-	}
-	message = message + ")"
-	return message
-}
-
-type LeafNode struct {
-	id     int
-	tuples []*Tuple
-}
-
-func (n *LeafNode) SetID(id int) {
-	n.id = id
-}
-
-func (n *LeafNode) Children() []int {
-	return []int{}
-}
-
-// func NewNode(tuples []*Tuple, children []int) *LeafNode {
-// 	return &LeafNode{tuples: tuples, children: children}
-// }
-
-func (n *LeafNode) Keys() []int {
-	keys := []int{}
-	for _, tuple := range n.tuples {
-		keys = append(keys, tuple.key)
-	}
-	return keys
-}
-
-func (n *LeafNode) String() string {
-	message := "LeafNode ("
-	keys := n.Keys()
-	for _, key := range keys {
-		message = message + fmt.Sprintf("%v ", key)
-	}
-	message = message + ")"
-	return message
-}
-
-type Tuple struct {
-	key   int
-	value string
-}
-
-type ByKey []*Tuple
-
-func (a ByKey) Len() int           { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
-
-func (t *BTree) addNewNode(node Node) int {
-	idx := len(t.nodes)
-	t.nodes = append(t.nodes, node)
-	node.SetID(idx)
-	return idx
-}
-
-func (t *BTree) newRoot(middleKey int, children []int) {
+func (t *BTree) newRoot(middleKey uint32, children []uint32) {
 	newRoot := &InternalNode{
-		keys:     []int{middleKey},
+		keys:     []uint32{middleKey},
 		children: children,
 	}
 	t.addNewNode(newRoot)
@@ -135,7 +153,7 @@ func (t *BTree) newRoot(middleKey int, children []int) {
 // Else, must split L into L and a new node L2
 //  Redistribute entries evenly, copy up middle key
 //  Insert index entry pointing to L2 into parent of L
-func (t *BTree) Insert(key int, value string) {
+func (t *BTree) Insert(key uint32, value []byte) {
 	nodes := t.lookup([]Node{t.rootNode}, key)
 	node, nodes := nodes[len(nodes)-1], nodes[:len(nodes)-1]
 	leafNode := node.(*LeafNode)
@@ -151,7 +169,7 @@ func (t *BTree) Insert(key int, value string) {
 		nodeId := t.addNewNode(leafNode2)
 		middleKey := newTuples[midIdx].key
 		if len(nodes) == 0 {
-			t.newRoot(middleKey, []int{leafNode.id, nodeId})
+			t.newRoot(middleKey, []uint32{leafNode.id, nodeId})
 		} else {
 			for i := len(nodes); i > 0; i-- {
 				parentNode := nodes[i-1].(*InternalNode)
@@ -162,7 +180,7 @@ func (t *BTree) Insert(key int, value string) {
 					middleKey = result.middleKey
 					nodeId = result.newNodeId
 					if t.rootNode == parentNode {
-						t.newRoot(middleKey, []int{parentNode.id, nodeId})
+						t.newRoot(middleKey, []uint32{parentNode.id, nodeId})
 					}
 				}
 			}
@@ -171,8 +189,7 @@ func (t *BTree) Insert(key int, value string) {
 	}
 }
 
-// write a method: node add key
-func (n *InternalNode) addChildren(key int, nodeId int, t *BTree) AddKeyResult {
+func (n *InternalNode) addChildren(key uint32, nodeId uint32, t *BTree) AddKeyResult {
 	idx := 0
 	for _, k := range n.keys {
 		if key < k {
@@ -215,20 +232,27 @@ func (n *InternalNode) addChildren(key int, nodeId int, t *BTree) AddKeyResult {
 
 type AddKeyResult struct {
 	splited   bool
-	middleKey int
-	newNodeId int
+	middleKey uint32
+	newNodeId uint32
 }
 
-func (t *BTree) Delete(key int) {
+func (t *BTree) Delete(key uint32) {
 
 }
 
-func (t *BTree) getNode(nodeId int) Node {
-	return t.nodes[nodeId]
+func (t *BTree) Find(key uint32) *Tuple {
+	nodes := t.lookup([]Node{t.rootNode}, key)
+	leafNode := nodes[len(nodes)-1].(*LeafNode)
+	for _, tuple := range leafNode.tuples {
+		if tuple.key == key {
+			return tuple
+		}
+	}
+	return nil
 }
 
 // return node and it's ancestor nodes
-func (t *BTree) lookup(nodes []Node, key int) []Node {
+func (t *BTree) lookup(nodes []Node, key uint32) []Node {
 	node := nodes[len(nodes)-1]
 
 	if len(node.Children()) == 0 {
