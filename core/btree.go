@@ -103,7 +103,6 @@ func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 type BTree struct {
 	rootNode        Node
 	capacityPerNode int
-	nodes           []Node
 	noder           Noder
 }
 
