@@ -19,3 +19,23 @@ https://15445.courses.cs.cmu.edu/fall2018/slides/07-trees1.pdf
 https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html
 
 According to this video(https://youtu.be/VHSDhMO63ww?t=849), you should not record a pointer to parent node, because it's error prone when concurrency update. 
+
+insert
+delete
+search
+
+leaf node, internal node
+leaf node and internal node is interface
+#### common node interface
+NodeType() => root, internal, leaf
+Keys() => return keys of node
+Put()
+
+
+maybe I can implement a dummy version (no interface), and then extract the common part.
+[1, 5, 7, 11, 17]
+1,5,7
+11,17
+
+
+L 分割成 Ｌ, L2, 把 middle key 丟到 parent node
