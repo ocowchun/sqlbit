@@ -2,12 +2,14 @@ package core
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 )
 
 type FileNoder struct {
-	pager *Pager2
+	pager   *Pager2
+	nodeMap map[uint32]Node
 }
 
 const PAGE_TYPE_SIZE = 2
@@ -15,7 +17,36 @@ const PAGE_TYPE_TABLE_HEADER = 0
 const PAGE_TYPE_INTERNAL_NODE = 1
 const PAGE_TYPE_LEAF_NODE = 2
 
+const TABLE_HEADER_ROOT_PAGE_NUM_SIZE = 4
+const TABLE_HEADER_HEADER_SIZE = PAGE_TYPE_SIZE + TABLE_HEADER_ROOT_PAGE_NUM_SIZE
+
+type TableHeader struct {
+	rootPageNum uint32
+}
+
+func (n FileNoder) ReadTableHeader() (*TableHeader, error) {
+	bytes, err := n.pager.ReadPage(0)
+
+	if err != nil {
+		return nil, err
+	}
+	bs := bytes[:PAGE_TYPE_SIZE]
+	pageType := binary.LittleEndian.Uint16(bs)
+
+	if pageType != PAGE_TYPE_TABLE_HEADER {
+		return nil, errors.New("Incorrect page_type for Table Header")
+	}
+	from := PAGE_TYPE_SIZE
+	bs = bytes[from : from+TABLE_HEADER_ROOT_PAGE_NUM_SIZE]
+	rootPageNum := binary.LittleEndian.Uint32(bs)
+	return &TableHeader{rootPageNum: rootPageNum}, nil
+}
+
 func (n *FileNoder) Read(nodeId uint32) Node {
+	if n.nodeMap[nodeId] != nil {
+		return n.nodeMap[nodeId]
+	}
+
 	bytes, err := n.pager.ReadPage(nodeId)
 
 	if err != nil {
@@ -96,4 +127,12 @@ func deserializeLeafNode(nodeId uint32, bytes []byte) *LeafNode {
 		id:     nodeId,
 		tuples: tuples,
 	}
+}
+
+func (n *FileNoder) Add(node Node) uint32 {
+	pageNum := n.pager.IncrementPageNum()
+	nodeId := uint32(pageNum)
+	node.SetID(nodeId)
+	n.nodeMap[nodeId] = node
+	return nodeId
 }
