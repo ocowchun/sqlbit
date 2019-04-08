@@ -11,8 +11,9 @@ import (
 
 // The Pager access the page cache and file.
 type Pager struct {
-	file  *os.File
-	pages [TABLE_MAX_PAGES]*Page
+	file     *os.File
+	pages    [TABLE_MAX_PAGES]*Page
+	numPages int64
 }
 
 // OpenPager will create a Pager instance to access file given fileName
@@ -22,7 +23,16 @@ func OpenPager(fileName string) (*Pager, error) {
 		return nil, err
 	}
 
-	return &Pager{file: f}, nil
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	numPages := fi.Size() / PAGE_SIZE
+	pager := &Pager{
+		file:     f,
+		numPages: numPages,
+	}
+	return pager, nil
 }
 
 func (p *Pager) FileSize() (int64, error) {
@@ -58,6 +68,9 @@ func (p *Pager) ReadPage(pageNum int) (*Page, error) {
 		return nil, err
 	}
 	p.pages[pageNum] = page
+	if int64(pageNum) >= p.numPages {
+		p.numPages = int64(pageNum) + 1
+	}
 	return page, nil
 
 }

@@ -91,6 +91,27 @@ type Table struct {
 	numRows int
 	pages   [TABLE_MAX_PAGES]*Page
 	pager   *Pager
+	btree   *BTree
+}
+
+func OpenBtree(fileName string) (*BTree, error) {
+	pager, err := OpenPager2(fileName)
+	if err != nil {
+		return nil, err
+	}
+	fileNoder := &FileNoder{pager: pager}
+	header, err := fileNoder.ReadTableHeader()
+	if err != nil {
+		return nil, err
+	}
+
+	rootNode := fileNoder.Read(header.rootPageNum)
+	btree := &BTree{
+		rootNode:        rootNode,
+		capacityPerNode: ROW_PER_PAGE,
+		noder:           fileNoder,
+	}
+	return btree, nil
 }
 
 func OpenTable(fileName string) (*Table, error) {
@@ -100,9 +121,18 @@ func OpenTable(fileName string) (*Table, error) {
 		return nil, err
 	}
 	numRows := (fileSize/PAGE_SIZE)*14 + (fileSize%PAGE_SIZE)/ROW_SIZE
+	rootNode := &LeafNode{
+		id:     0,
+		tuples: []*Tuple{},
+	}
+	btree := &BTree{
+		rootNode:        rootNode,
+		capacityPerNode: ROW_PER_PAGE,
+	}
 	return &Table{
 		numRows: int(numRows),
 		pager:   pager,
+		btree:   btree,
 	}, nil
 }
 
@@ -164,16 +194,20 @@ func (t *Table) Pages() [TABLE_MAX_PAGES]*Page {
 // Cursor represents a location in the table.
 type Cursor struct {
 	table      *Table
-	rowNum     int
 	endOfTable bool
+	pageNum    int
+	cellNum    int
+	// Deprecated
+	rowNum int
 }
 
 // * Create a cursor at the beginning of the table
 func newCursorFromStart(table *Table) *Cursor {
 	return &Cursor{
 		table:      table,
-		rowNum:     0,
 		endOfTable: table.numRows == 0,
+		// pageNum:    table.btree.rootNode.id,
+		rowNum: 0,
 	}
 }
 
