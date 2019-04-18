@@ -29,8 +29,8 @@ func TestBtree(t *testing.T) {
 		tuples: []*Tuple{},
 	}
 	tree := &BTree{
-		rootNode:        rootNode,
-		capacityPerNode: 2,
+		rootNode:            rootNode,
+		capacityPerLeafNode: 2,
 		noder: &DummyNoder{
 			nodes: []Node{rootNode},
 		},
@@ -55,7 +55,7 @@ func TestBtree(t *testing.T) {
 	assert.Nil(t, tree.Find(10))
 }
 
-func prepareBtreeFile(fileName string) {
+func prepareBtreeFile(fileName string, tuples []*Tuple) {
 	f, _ := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
 	w := bufio.NewWriter(f)
 
@@ -72,7 +72,6 @@ func prepareBtreeFile(fileName string) {
 	b = make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, uint16(PAGE_TYPE_LEAF_NODE))
 	bs = append(bs, b...)
-	tuples := []*Tuple{createTuple(17), createTuple(42)}
 	numTuples := uint32(len(tuples))
 	b = make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, numTuples)
@@ -89,16 +88,17 @@ func prepareBtreeFile(fileName string) {
 func TestOpenBtreeFromFile(t *testing.T) {
 	removeTestFile()
 	fileName := getTestFileName()
-	prepareBtreeFile(fileName)
+	tuples := []*Tuple{createTuple(17), createTuple(42)}
+	prepareBtreeFile(fileName, tuples)
 	pager, _ := OpenPager2(fileName)
-	fileNoder := &FileNoder{pager: pager}
+	fileNoder := NewFileNoder(pager)
 	header, _ := fileNoder.ReadTableHeader()
 	rootNode := fileNoder.Read(header.rootPageNum)
 
 	tree := &BTree{
-		rootNode:        rootNode,
-		capacityPerNode: ROW_PER_PAGE,
-		noder:           fileNoder,
+		rootNode:            rootNode,
+		capacityPerLeafNode: ROW_PER_PAGE,
+		noder:               fileNoder,
 	}
 
 	assert.Equal(t, tree.rootNode.Keys(), []uint32{17, 42})

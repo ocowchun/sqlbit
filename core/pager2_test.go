@@ -48,3 +48,24 @@ func TestReadPage2(t *testing.T) {
 	assert.Equal(t, uint32(9527), binary.LittleEndian.Uint32(bytes[:4]))
 	removeTestFile()
 }
+
+func TestFlushPage2(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	pager, _ := OpenPager2(fileName)
+	pageNum := 1
+	bs := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bs, uint32(9527))
+	bs = append(bs, make([]byte, PAGE_SIZE-len(bs))...)
+
+	err := pager.FlushPage(pageNum, bs)
+
+	assert.Nil(t, err)
+	pager.Close()
+	f, _ := os.Open(fileName)
+	f.Seek(int64(pageNum*PAGE_SIZE), 0)
+	b2 := make([]byte, PAGE_SIZE)
+	f.Read(b2)
+	assert.Equal(t, bs, b2)
+	removeTestFile()
+}

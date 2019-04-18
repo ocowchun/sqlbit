@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 const COLUMN_USERNAME_LENGTH = 32
@@ -88,35 +89,50 @@ const TABLE_MAX_PAGES = 100
 const TABLE_MAX_ROWS = TABLE_MAX_PAGES * ROW_PER_PAGE
 
 type Table struct {
-	numRows int
-	pages   [TABLE_MAX_PAGES]*Page
-	pager   *Pager
+	numRows   int
+	pages     [TABLE_MAX_PAGES]*Page
+	pager     *Pager
+	btree     *BTree
+	pager2    *Pager2
+	fileNoder *FileNoder
 }
 
-func OpenTable(fileName string) (*Table, error) {
-	pager, _ := OpenPager(fileName)
-	fileSize, err := pager.FileSize()
+func OpenBtree(fileNoder *FileNoder) (*BTree, error) {
+	header, err := fileNoder.ReadTableHeader()
 	if err != nil {
 		return nil, err
 	}
-	numRows := (fileSize/PAGE_SIZE)*14 + (fileSize%PAGE_SIZE)/ROW_SIZE
+
+	rootNode := fileNoder.Read(header.rootPageNum)
+	btree := &BTree{
+		rootNode:            rootNode,
+		capacityPerLeafNode: ROW_PER_PAGE,
+		noder:               fileNoder,
+	}
+	return btree, nil
+}
+
+func OpenTable(fileName string) (*Table, error) {
+	pager, err := OpenPager2(fileName)
+	if err != nil {
+		return nil, err
+	}
+	fileNoder := NewFileNoder(pager)
+
+	bTree, err := OpenBtree(fileNoder)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Table{
-		numRows: int(numRows),
-		pager:   pager,
+		btree:     bTree,
+		pager2:    pager,
+		fileNoder: fileNoder,
 	}, nil
 }
 
 func (t *Table) CloseTable() error {
-	for pageNum, page := range t.pager.pages {
-		if page != nil {
-			err := t.pager.FlushPage(pageNum)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	err := t.pager.file.Close()
-	return err
+	return t.fileNoder.Save(t.btree)
 }
 
 func (t *Table) rowSlot(rowNum int) (*Row, error) {
@@ -129,13 +145,8 @@ func (t *Table) rowSlot(rowNum int) (*Row, error) {
 }
 
 func (t *Table) InsertRow(newRow *Row) error {
-	c := newCursorFromEnd(t)
-	row, err := c.value()
-	if err != nil {
-		return err
-	}
-	row.update(newRow)
-	t.numRows = t.numRows + 1
+	c := newCursorFromStart(t)
+	c.write(newRow)
 	return nil
 }
 
@@ -164,16 +175,24 @@ func (t *Table) Pages() [TABLE_MAX_PAGES]*Page {
 // Cursor represents a location in the table.
 type Cursor struct {
 	table      *Table
-	rowNum     int
 	endOfTable bool
+	pageNum    int
+	cellNum    int
+
+	leafNode *LeafNode
+
+	// Deprecated
+	rowNum int
 }
 
 // * Create a cursor at the beginning of the table
 func newCursorFromStart(table *Table) *Cursor {
+	leafNode := table.btree.FirstLeafNode()
 	return &Cursor{
 		table:      table,
-		rowNum:     0,
-		endOfTable: table.numRows == 0,
+		endOfTable: len(leafNode.Keys()) == 0,
+		leafNode:   leafNode,
+		rowNum:     1,
 	}
 }
 
@@ -188,19 +207,34 @@ func newCursorFromEnd(table *Table) *Cursor {
 
 // Access the row the cursor is pointing to
 func (c *Cursor) value() (*Row, error) {
-	rowNum := c.rowNum
-	pageNum := rowNum / ROW_PER_PAGE
-	page, err := c.table.pager.ReadPage(pageNum)
-	if err != nil {
-		return nil, err
-	}
-	return page.rows[rowNum%ROW_PER_PAGE], nil
+	tuple := c.leafNode.tuples[c.cellNum]
+	bs := tuple.value
+	id := binary.LittleEndian.Uint32(bs)
+	replacer := strings.NewReplacer("\x00", "")
+	usrename := replacer.Replace(string(bs[4:COLUMN_USERNAME_LENGTH]))
+	email := replacer.Replace(string(bs[36:COLUMN_EMAIL_LENGTH]))
+
+	row := NewRow(id, usrename, email)
+	return row, nil
+}
+
+// Overwrite the row
+func (c *Cursor) write(row *Row) {
+	c.table.btree.Insert(row.Id(), row.Bytes())
 }
 
 // Advance the cursor to the next row
 func (c *Cursor) advance() {
-	c.rowNum = c.rowNum + 1
-	if c.rowNum >= c.table.numRows {
+	c.cellNum = c.cellNum + 1
+	if c.cellNum >= LEAF_NODE_KEY_PER_PAGE {
+		newLeafNode := c.table.btree.NextLeafNode(c.leafNode)
+		if newLeafNode != nil {
+			c.cellNum = 0
+			c.leafNode = newLeafNode
+		} else {
+			c.endOfTable = true
+		}
+	} else if c.cellNum >= len(c.leafNode.Keys()) {
 		c.endOfTable = true
 	}
 }

@@ -1,6 +1,8 @@
 ## TODO
 - [x] load btree from file
-- [ ] write tuple to btree
+- [x] write tuple to btree
+- [ ] refactor code, put fileNoder, pager2 their function in right place
+- [ ] add sibling pointer to leaf node
 
 
 insert 1 cstack foo@bar.com
@@ -72,3 +74,15 @@ PAGE_TYPE(2 bytes), Child1(291 bytes), Child2(291 bytes)...
 
 ### load btree from file
 first page is table header, which will record the pageNum to rootPage
+
+### write tuple to btree
+use Cursor to encapsulated the btree details
+Table <=> Cursor <=> Btree
+
+Add a new method `Write(row *Row)` to Cursor
+
+#### flush Btree node to file
+when? db close?
+
+
+how to create init db file?

@@ -12,6 +12,14 @@ type FileNoder struct {
 	nodeMap map[uint32]Node
 }
 
+func NewFileNoder(pager *Pager2) *FileNoder {
+	nodeMap := make(map[uint32]Node)
+	return &FileNoder{
+		pager:   pager,
+		nodeMap: nodeMap,
+	}
+}
+
 const PAGE_TYPE_SIZE = 2
 const PAGE_TYPE_TABLE_HEADER = 0
 const PAGE_TYPE_INTERNAL_NODE = 1
@@ -42,6 +50,15 @@ func (n FileNoder) ReadTableHeader() (*TableHeader, error) {
 	return &TableHeader{rootPageNum: rootPageNum}, nil
 }
 
+func serializeTableHeader(tree *BTree) []byte {
+	bs := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bs, uint16(PAGE_TYPE_TABLE_HEADER))
+
+	rootPageNum := uint32(tree.rootNode.ID())
+	bs = append(bs, convertUint32ToBytes(rootPageNum)...)
+	return append(bs, make([]byte, PAGE_SIZE-len(bs))...)
+}
+
 func (n *FileNoder) Read(nodeId uint32) Node {
 	if n.nodeMap[nodeId] != nil {
 		return n.nodeMap[nodeId]
@@ -58,15 +75,20 @@ func (n *FileNoder) Read(nodeId uint32) Node {
 	bs := bytes[:PAGE_TYPE_SIZE]
 
 	pageType := binary.LittleEndian.Uint16(bs)
+	var node Node
 	if pageType == PAGE_TYPE_INTERNAL_NODE {
-		return deserializeInternalNode(nodeId, bytes)
+		node = deserializeInternalNode(nodeId, bytes)
 	} else if pageType == PAGE_TYPE_LEAF_NODE {
-		return deserializeLeafNode(nodeId, bytes)
+		node = deserializeLeafNode(nodeId, bytes)
 	} else {
 		fmt.Println("You can't convert unknwon page to node")
 		os.Exit(1)
 		return nil
 	}
+	if node != nil {
+		n.nodeMap[nodeId] = node
+	}
+	return node
 }
 
 const INTERNAL_NODE_NUM_KEYS_SIZE = 4
@@ -105,9 +127,31 @@ func deserializeInternalNode(nodeId uint32, bytes []byte) *InternalNode {
 	}
 }
 
+func serializeInternalNode(node *InternalNode) []byte {
+	bs := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bs, uint16(PAGE_TYPE_INTERNAL_NODE))
+
+	numKeys := uint32(len(node.keys))
+	bs = append(bs, convertUint32ToBytes(numKeys)...)
+
+	bs = append(bs, convertUint32ToBytes(node.children[0])...)
+	for idx, key := range node.keys {
+		bs = append(bs, convertUint32ToBytes(key)...)
+		bs = append(bs, convertUint32ToBytes(node.children[idx+1])...)
+	}
+	return bs
+}
+
+func convertUint32ToBytes(num uint32) []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, num)
+	return b
+}
+
 const LEAF_NODE_NUM_TUPLE_SIZE = 4
 const LEAF_NODE_HEADER_SIZE = PAGE_TYPE_SIZE + LEAF_NODE_NUM_TUPLE_SIZE
 const LEAF_NODE_CHILD_SIZE = ROW_SIZE
+const LEAF_NODE_KEY_PER_PAGE = (PAGE_SIZE - LEAF_NODE_HEADER_SIZE) / LEAF_NODE_CHILD_SIZE
 
 func deserializeLeafNode(nodeId uint32, bytes []byte) *LeafNode {
 	tuples := []*Tuple{}
@@ -129,10 +173,47 @@ func deserializeLeafNode(nodeId uint32, bytes []byte) *LeafNode {
 	}
 }
 
+func serializeLeafNode(node *LeafNode) []byte {
+	bs := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bs, uint16(PAGE_TYPE_LEAF_NODE))
+
+	numTuples := uint32(len(node.tuples))
+	bs = append(bs, convertUint32ToBytes(numTuples)...)
+
+	for _, tuple := range node.tuples {
+		bs = append(bs, tuple.value...)
+	}
+	return bs
+}
+
 func (n *FileNoder) Add(node Node) uint32 {
 	pageNum := n.pager.IncrementPageNum()
 	nodeId := uint32(pageNum)
 	node.SetID(nodeId)
 	n.nodeMap[nodeId] = node
 	return nodeId
+}
+
+func (n *FileNoder) Save(tree *BTree) error {
+	b := serializeTableHeader(tree)
+	err := n.pager.FlushPage(0, b)
+	if err != nil {
+		return err
+	}
+
+	for pageNum, node := range n.nodeMap {
+		var bs []byte
+		if node.NodeType() == "InternalNode" {
+			bs = serializeInternalNode(node.(*InternalNode))
+		} else if node.NodeType() == "LeafNode" {
+			bs = serializeLeafNode(node.(*LeafNode))
+		} else {
+			return errors.New("can't save invalid node to file")
+		}
+		err := n.pager.FlushPage(int(pageNum), bs)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

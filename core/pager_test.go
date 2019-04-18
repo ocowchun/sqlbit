@@ -2,7 +2,6 @@ package core
 
 import (
 	"bufio"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -51,7 +50,6 @@ func TestReadPage(t *testing.T) {
 	page, err := pager.ReadPage(0)
 
 	assert.Nil(t, err)
-	fmt.Println(page.rows[0])
 	assert.Equal(t, row.Id(), page.Rows()[0].Id())
 	assert.Equal(t, row.Username(), page.Rows()[0].Username())
 	assert.Equal(t, row.Email(), page.Rows()[0].Email())

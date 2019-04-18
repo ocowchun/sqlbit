@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bufio"
 	"io"
 	"os"
 )
@@ -49,7 +50,28 @@ func (p *Pager2) ReadPage(pageNum uint32) ([]byte, error) {
 	return bytes, nil
 }
 
+// IncrementPageNum is deprecated
 func (p *Pager2) IncrementPageNum() int64 {
 	p.numPages = p.numPages + 1
 	return p.numPages
+}
+
+func (p *Pager2) FlushPage(pageNum int, bs []byte) error {
+	_, err := p.file.Seek(int64(pageNum*PAGE_SIZE), 0)
+	if err != nil {
+		return err
+	}
+
+	w := bufio.NewWriter(p.file)
+	_, err = w.Write(bs)
+	if err != nil {
+		return err
+	}
+	w.Flush()
+
+	return nil
+}
+
+func (p *Pager2) Close() error {
+	return p.file.Close()
 }

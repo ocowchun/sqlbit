@@ -24,7 +24,7 @@ func TestReadTableHeader(t *testing.T) {
 	w.Flush()
 	f.Close()
 	pager, _ := OpenPager2(fileName)
-	fileNoder := &FileNoder{pager: pager}
+	fileNoder := NewFileNoder(pager)
 
 	header, err := fileNoder.ReadTableHeader()
 
@@ -58,7 +58,7 @@ func TestReadInternalNode(t *testing.T) {
 	w.Flush()
 	f.Close()
 	pager, _ := OpenPager2(fileName)
-	fileNoder := &FileNoder{pager: pager}
+	fileNoder := NewFileNoder(pager)
 
 	node := fileNoder.Read(1)
 
@@ -110,7 +110,7 @@ func TestReadLeafNode(t *testing.T) {
 	w.Flush()
 	f.Close()
 	pager, _ := OpenPager2(fileName)
-	fileNoder := &FileNoder{pager: pager}
+	fileNoder := NewFileNoder(pager)
 
 	node := fileNoder.Read(1)
 
@@ -133,5 +133,32 @@ func TestAddNode(t *testing.T) {
 	nodeId := fileNoder.Add(node)
 
 	assert.Equal(t, uint32(1), nodeId)
+	removeTestFile()
+}
+
+func TestSaveBtreeToFile(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{}
+	prepareBtreeFile(fileName, tuples)
+	pager, _ := OpenPager2(fileName)
+	fileNoder := NewFileNoder(pager)
+	header, _ := fileNoder.ReadTableHeader()
+	rootNode := fileNoder.Read(header.rootPageNum)
+	tree := &BTree{
+		rootNode:            rootNode,
+		capacityPerLeafNode: ROW_PER_PAGE,
+		noder:               fileNoder,
+	}
+
+	tree.Insert(1, createTuple(1).value)
+	tree.Insert(2, createTuple(2).value)
+	tree.Insert(3, createTuple(3).value)
+	fileNoder.Save(tree)
+
+	pager.Close()
+	pager, _ = OpenPager2(fileName)
+	tree2, _ := OpenBtree(NewFileNoder(pager))
+	assert.Equal(t, tree2.rootNode.Keys(), []uint32{1, 2, 3})
 	removeTestFile()
 }

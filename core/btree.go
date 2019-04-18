@@ -89,6 +89,10 @@ func (n *LeafNode) String() string {
 	return message
 }
 
+func (n *LeafNode) SetTuples(newTuples []*Tuple) {
+	n.tuples = newTuples
+}
+
 type Tuple struct {
 	key   uint32
 	value []byte
@@ -101,9 +105,9 @@ func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 
 type BTree struct {
-	rootNode        Node
-	capacityPerNode int
-	noder           Noder
+	rootNode            Node
+	capacityPerLeafNode int
+	noder               Noder
 }
 
 type Noder interface {
@@ -159,11 +163,11 @@ func (t *BTree) Insert(key uint32, value []byte) {
 	keys := node.Keys()
 	newTuples := append(leafNode.tuples, &Tuple{key, value})
 	sort.Sort(ByKey(newTuples))
-	if len(keys) < t.capacityPerNode {
-		leafNode.tuples = newTuples
+	if len(keys) < t.capacityPerLeafNode {
+		leafNode.SetTuples(newTuples)
 	} else {
 		midIdx := len(newTuples) / 2
-		leafNode.tuples = newTuples[0:midIdx]
+		leafNode.SetTuples(newTuples[0:midIdx])
 		leafNode2 := &LeafNode{tuples: newTuples[midIdx:]}
 		nodeId := t.addNewNode(leafNode2)
 		middleKey := newTuples[midIdx].key
@@ -205,7 +209,7 @@ func (n *InternalNode) addChildren(key uint32, nodeId uint32, t *BTree) AddKeyRe
 	copy(children[idx+2:], children[idx+1:])
 	children[idx+1] = nodeId
 
-	if len(keys) <= t.capacityPerNode {
+	if len(keys) <= t.capacityPerLeafNode {
 		n.keys = keys
 		n.children = children
 		return AddKeyResult{
@@ -248,6 +252,35 @@ func (t *BTree) Find(key uint32) *Tuple {
 		}
 	}
 	return nil
+}
+
+func (t *BTree) First() *Tuple {
+	node := t.rootNode
+	for node.NodeType() != "LeafNode" {
+		leftChild := node.Children()[0]
+		node = t.getNode(leftChild)
+	}
+	leafNode := node.(*LeafNode)
+	return leafNode.tuples[0]
+}
+
+// Return left most leaf node
+func (t *BTree) FirstLeafNode() *LeafNode {
+	node := t.rootNode
+	for node.NodeType() != "LeafNode" {
+		leftChild := node.Children()[0]
+		node = t.getNode(leftChild)
+	}
+	leafNode := node.(*LeafNode)
+	return leafNode
+}
+
+// Return node's right sibling
+func (t *BTree) NextLeafNode(node *LeafNode) *LeafNode {
+	key := node.Keys()[len(node.Keys())-1]
+	nodes := t.lookup([]Node{t.rootNode}, key+1)
+	leafNode := nodes[len(nodes)-1].(*LeafNode)
+	return leafNode
 }
 
 // return node and it's ancestor nodes
