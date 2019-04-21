@@ -50,6 +50,12 @@ func (n *InternalNode) String() string {
 	return message
 }
 
+type ILeafNode interface {
+	ID() uint32
+	Tuples() []*Tuple
+	SetTuples(newTuples []*Tuple)
+}
+
 type LeafNode struct {
 	id     uint32
 	tuples []*Tuple
@@ -65,6 +71,10 @@ func (n *LeafNode) SetID(id uint32) {
 
 func (n *LeafNode) Children() []uint32 {
 	return []uint32{}
+}
+
+func (n *LeafNode) Tuples() []*Tuple {
+	return n.tuples
 }
 
 func (n *LeafNode) Keys() []uint32 {
@@ -112,7 +122,8 @@ type BTree struct {
 
 type Noder interface {
 	Read(nodeId uint32) Node
-	Add(node Node) uint32
+	NewLeafNode(tuples []*Tuple) ILeafNode
+	NewInternalNode(keys []uint32, children []uint32) *InternalNode
 }
 
 func (t *BTree) String() string {
@@ -137,16 +148,8 @@ func (t *BTree) getNode(nodeId uint32) Node {
 	return t.noder.Read(nodeId)
 }
 
-func (t *BTree) addNewNode(node Node) uint32 {
-	return t.noder.Add(node)
-}
-
 func (t *BTree) newRoot(middleKey uint32, children []uint32) {
-	newRoot := &InternalNode{
-		keys:     []uint32{middleKey},
-		children: children,
-	}
-	t.addNewNode(newRoot)
+	newRoot := t.noder.NewInternalNode([]uint32{middleKey}, children)
 	t.rootNode = newRoot
 }
 
@@ -159,20 +162,21 @@ func (t *BTree) newRoot(middleKey uint32, children []uint32) {
 func (t *BTree) Insert(key uint32, value []byte) {
 	nodes := t.lookup([]Node{t.rootNode}, key)
 	node, nodes := nodes[len(nodes)-1], nodes[:len(nodes)-1]
-	leafNode := node.(*LeafNode)
+	// leafNode := node.(*LeafNode)
+	leafNode := node.(ILeafNode)
 	keys := node.Keys()
-	newTuples := append(leafNode.tuples, &Tuple{key, value})
+	newTuples := append(leafNode.Tuples(), &Tuple{key, value})
 	sort.Sort(ByKey(newTuples))
 	if len(keys) < t.capacityPerLeafNode {
 		leafNode.SetTuples(newTuples)
 	} else {
 		midIdx := len(newTuples) / 2
 		leafNode.SetTuples(newTuples[0:midIdx])
-		leafNode2 := &LeafNode{tuples: newTuples[midIdx:]}
-		nodeId := t.addNewNode(leafNode2)
+		leafNode2 := t.noder.NewLeafNode(newTuples[midIdx:])
+		nodeId := leafNode2.ID()
 		middleKey := newTuples[midIdx].key
 		if len(nodes) == 0 {
-			t.newRoot(middleKey, []uint32{leafNode.id, nodeId})
+			t.newRoot(middleKey, []uint32{leafNode.ID(), nodeId})
 		} else {
 			for i := len(nodes); i > 0; i-- {
 				parentNode := nodes[i-1].(*InternalNode)
@@ -219,16 +223,12 @@ func (n *InternalNode) addChildren(key uint32, nodeId uint32, t *BTree) AddKeyRe
 		midIdx := len(keys) / 2
 		n.keys = keys[0:midIdx]
 		n.children = children[0 : midIdx+1]
-		node2 := &InternalNode{
-			keys:     keys[midIdx+1:],
-			children: children[midIdx+1:],
-		}
+		node2 := t.noder.NewInternalNode(keys[midIdx+1:], children[midIdx+1:])
 		middleKey := keys[midIdx]
-		newNodeId := t.addNewNode(node2)
 		return AddKeyResult{
 			splited:   true,
 			middleKey: middleKey,
-			newNodeId: newNodeId,
+			newNodeId: node2.ID(),
 		}
 	}
 }
@@ -246,7 +246,7 @@ func (t *BTree) Delete(key uint32) {
 func (t *BTree) Find(key uint32) *Tuple {
 	nodes := t.lookup([]Node{t.rootNode}, key)
 	leafNode := nodes[len(nodes)-1].(*LeafNode)
-	for _, tuple := range leafNode.tuples {
+	for _, tuple := range leafNode.Tuples() {
 		if tuple.key == key {
 			return tuple
 		}
@@ -261,7 +261,7 @@ func (t *BTree) First() *Tuple {
 		node = t.getNode(leftChild)
 	}
 	leafNode := node.(*LeafNode)
-	return leafNode.tuples[0]
+	return leafNode.Tuples()[0]
 }
 
 // Return left most leaf node

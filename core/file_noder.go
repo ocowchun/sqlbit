@@ -186,12 +186,30 @@ func serializeLeafNode(node *LeafNode) []byte {
 	return bs
 }
 
-func (n *FileNoder) Add(node Node) uint32 {
+func (n *FileNoder) add(node Node) uint32 {
 	pageNum := n.pager.IncrementPageNum()
 	nodeId := uint32(pageNum)
 	node.SetID(nodeId)
 	n.nodeMap[nodeId] = node
 	return nodeId
+}
+
+func (n *FileNoder) NewLeafNode(tuples []*Tuple) ILeafNode {
+	node := &LeafNode{tuples: tuples}
+	id := n.add(node)
+	node.SetID(id)
+	return node
+}
+
+func (n *FileNoder) NewInternalNode(keys []uint32, children []uint32) *InternalNode {
+	node := &InternalNode{
+		keys:     keys,
+		children: children,
+	}
+
+	id := n.add(node)
+	node.SetID(id)
+	return node
 }
 
 func (n *FileNoder) Save(tree *BTree) error {

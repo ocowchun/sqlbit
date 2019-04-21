@@ -130,7 +130,7 @@ func TestAddNode(t *testing.T) {
 	fileNoder := &FileNoder{pager: pager, nodeMap: nodeMap}
 
 	node := &InternalNode{}
-	nodeId := fileNoder.Add(node)
+	nodeId := fileNoder.add(node)
 
 	assert.Equal(t, uint32(1), nodeId)
 	removeTestFile()

@@ -11,6 +11,9 @@ insert 2147483647 ocowchun ocowchun@bar.com
 https://gobyexample.com/reading-files
 https://gobyexample.com/writing-files
 
+<!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
+
+
 ### Cursor
 https://cstack.github.io/db_tutorial/parts/part6.html
 
