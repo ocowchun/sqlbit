@@ -62,12 +62,13 @@ func TestExecuteInsert(t *testing.T) {
 	email := "harry@hogwarts.edu"
 	rowToInsert := core.NewRow(id, username, email)
 	s := Statement{StatementType_Insert, rowToInsert}
-	table := &core.Table{}
+	table := core.NewTable(core.NewDummyTree(), nil, nil)
 
 	result := ExecuteInsert(s, table)
 
 	assert.Equal(t, ExecuteResult_Success, result)
-	row := table.Pages()[0].Rows()[0]
+	rows, _ := table.Select()
+	row := rows[0]
 	assert.Equal(t, id, row.Id())
 	assert.Equal(t, "harry", row.Username())
 	assert.Equal(t, "harry@hogwarts.edu", row.Email())

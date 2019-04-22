@@ -66,32 +66,11 @@ const PAGE_SIZE = 4096
 const ROW_SIZE = 291
 const ROW_PER_PAGE = PAGE_SIZE / ROW_SIZE
 
-type Page struct {
-	rows [ROW_PER_PAGE]*Row
-}
-
-func (p *Page) Rows() [ROW_PER_PAGE]*Row {
-	return p.rows
-}
-
-func (p *Page) Bytes() []byte {
-	bs := []byte{}
-	for _, row := range p.rows {
-		if row.id == 0 {
-			break
-		}
-		bs = append(bs, row.Bytes()...)
-	}
-	return bs
-}
-
 const TABLE_MAX_PAGES = 100
 const TABLE_MAX_ROWS = TABLE_MAX_PAGES * ROW_PER_PAGE
 
 type Table struct {
 	numRows   int
-	pages     [TABLE_MAX_PAGES]*Page
-	pager     *Pager
 	btree     *BTree
 	pager2    *Pager2
 	fileNoder *FileNoder
@@ -119,29 +98,23 @@ func OpenTable(fileName string) (*Table, error) {
 	}
 	fileNoder := NewFileNoder(pager)
 
-	bTree, err := OpenBtree(fileNoder)
+	btree, err := OpenBtree(fileNoder)
 	if err != nil {
 		return nil, err
 	}
+	return NewTable(btree, pager, fileNoder), nil
+}
 
+func NewTable(btree *BTree, pager *Pager2, fileNoder *FileNoder) *Table {
 	return &Table{
-		btree:     bTree,
+		btree:     btree,
 		pager2:    pager,
 		fileNoder: fileNoder,
-	}, nil
+	}
 }
 
 func (t *Table) CloseTable() error {
 	return t.fileNoder.Save(t.btree)
-}
-
-func (t *Table) rowSlot(rowNum int) (*Row, error) {
-	pageNum := rowNum / ROW_PER_PAGE
-	page, err := t.pager.ReadPage(pageNum)
-	if err != nil {
-		return nil, err
-	}
-	return page.rows[rowNum%ROW_PER_PAGE], nil
 }
 
 func (t *Table) InsertRow(newRow *Row) error {
@@ -166,10 +139,6 @@ func (t *Table) Select() ([]*Row, error) {
 
 func (t *Table) NumRows() int {
 	return t.numRows
-}
-
-func (t *Table) Pages() [TABLE_MAX_PAGES]*Page {
-	return t.pages
 }
 
 // Cursor represents a location in the table.

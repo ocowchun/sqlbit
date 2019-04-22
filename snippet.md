@@ -1,4 +1,5 @@
 ## TODO
+- [ ] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
 - [ ] refactor code, put fileNoder, pager2 their function in right place
@@ -12,6 +13,33 @@ https://gobyexample.com/reading-files
 https://gobyexample.com/writing-files
 
 <!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
+
+### Buffer Pool
+https://15445.courses.cs.cmu.edu/fall2018/project1/
+page table will record 
+pageId, pageIdxInBufferPool, dirtyFlag, pin
+
+```go
+func (m *BufferPoolManager) evict(pageID uint32){
+    pageIdxInBufferPool := m.pageTable.map[pageID]
+    // use mutex to ensure no thread can access the page in pageTable
+    m.pageTable.free(pageID)
+    m.bufferPool.free(pageIdxInBufferPool)
+}
+
+// maybe we can let high level component handle the concurrency stuff? i.e. concurrency read write
+func (p *PageTable) Read(pageID uint32)  *page {
+    // use a readMutex to ensure no thread can modify the page in pageTable, but other thred can read
+    pageIdxInBufferPool := p.map[pageID]
+    p.bf.Pin(pageIdxInBufferPool)
+    page := p.bf.get(pageIdxInBufferPool)
+    if page.ID == pageID {
+        return page
+    } else {
+
+    }
+}
+```
 
 
 ### Cursor

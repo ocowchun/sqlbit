@@ -9,25 +9,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// func getTestFileName() string {
-// 	dir, _ := os.Getwd()
-// 	return dir + "/test.db"
-// }
+func getTestFileName() string {
+	dir, _ := os.Getwd()
+	return dir + "/test.db"
+}
 
-// func removeTestFile() {
-// 	fileName := getTestFileName()
-// 	_, err := os.Stat(fileName)
-// 	if err == nil {
-// 		os.Remove(fileName)
-// 	}
-// }
+func removeTestFile() {
+	fileName := getTestFileName()
+	_, err := os.Stat(fileName)
+	if err == nil {
+		os.Remove(fileName)
+	}
+}
 
-// func TestMain(m *testing.M) {
-// 	removeTestFile()
-// 	retCode := m.Run()
-// 	removeTestFile()
-// 	os.Exit(retCode)
-// }
+func TestMain(m *testing.M) {
+	removeTestFile()
+	retCode := m.Run()
+	removeTestFile()
+	os.Exit(retCode)
+}
 
 func TestReadPage2(t *testing.T) {
 	removeTestFile()
