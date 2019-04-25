@@ -19,6 +19,8 @@ https://15445.courses.cs.cmu.edu/fall2018/project1/
 page table will record 
 pageId, pageIdxInBufferPool, dirtyFlag, pin
 
+sorted map might be a good choice for Replacer
+
 ```go
 func (m *BufferPoolManager) evict(pageID uint32){
     pageIdxInBufferPool := m.pageTable.map[pageID]
