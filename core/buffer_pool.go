@@ -11,13 +11,13 @@ type Page []byte
 type Pager interface {
 	Read(offset int64, bs []byte)
 	Write(offset int64, bs []byte)
+	IncrementPageID() uint32
 }
 
 type Replacer interface {
 	Insert(pageID uint32)
 	Victim() (uint32, error)
 	Erase(pageID uint32)
-	// Size()
 }
 
 type pageMeta struct {
@@ -132,12 +132,40 @@ func (b *BufferPool) evict(pageId uint32) {
 
 func (b *BufferPool) UnpinPage(pageID uint32, isDirty bool) {
 	meta := b.pageTable[pageID]
-	meta.mu.RUnlock()
 	if isDirty {
 		meta.isDirty = true
 	}
+	meta.mu.RUnlock()
 	referenceCount := atomic.AddInt32(&meta.referenceCount, -1)
 	if referenceCount == 0 {
 		b.replacer.Insert(pageID)
 	}
+}
+
+func (b BufferPool) NewPage() (Page, error) {
+	pageID := b.pager.IncrementPageID()
+	frameIdx, err := b.getFreeFrameIdx()
+	if err != nil {
+		return nil, err
+	}
+
+	meta := newPageMeta(frameIdx, pageID)
+	b.pageTable[pageID] = meta
+
+	meta.mu.RLock()
+	atomic.AddInt32(&meta.referenceCount, 1)
+
+	b.replacer.Erase(pageID)
+
+	frame := b.frames[meta.frameIdx]
+	copy(frame, make([]byte, len(frame)))
+	return Page(frame), nil
+}
+
+// What if flush and unpin page concurrently
+func (b BufferPool) FlushPage(pageID uint32) {
+	meta := b.pageTable[pageID]
+	frame := b.frames[meta.frameIdx]
+	b.pager.Write(int64(pageID)*int64(PAGE_SIZE), frame)
+	meta.isDirty = false
 }

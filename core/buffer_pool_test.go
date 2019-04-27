@@ -42,6 +42,10 @@ func (d *DummyPager) Write(offset int64, bs []byte) {
 	d.body = append(tmp[:offset], append(bs, tmp[offset+PAGE_SIZE:]...)...)
 }
 
+func (d *DummyPager) IncrementPageID() uint32 {
+	return uint32(len(d.body) / PAGE_SIZE)
+}
+
 func TestFetchPage(t *testing.T) {
 	replacer := &DummyReplacer{
 		frameIndices: []uint32{},
@@ -113,4 +117,24 @@ func TestFetchPageWithEvictPageFailed(t *testing.T) {
 
 	assert.Nil(t, page)
 	assert.Equal(t, "no victim to evict", err.Error())
+}
+
+func TestFlushPage(t *testing.T) {
+	replacer := &DummyReplacer{
+		frameIndices: []uint32{},
+		pinnedIdxMap: make(map[uint32]bool),
+	}
+	bs := make([]byte, 4096)
+	pager := &DummyPager{body: bs}
+	pool := NewBufferPool(replacer, pager, 1, 1)
+	pageID := uint32(0)
+	page, _ := pool.FetchPage(pageID)
+
+	expectedPage := append([]byte{1, 2, 3, 4, 5}, make([]byte, PAGE_SIZE-5)...)
+	copy(page, expectedPage)
+	pool.UnpinPage(pageID, true)
+	pool.FlushPage(pageID)
+
+	assert.Equal(t, expectedPage, pager.body[:PAGE_SIZE])
+	assert.Equal(t, false, pool.pageTable[pageID].isDirty)
 }

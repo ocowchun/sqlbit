@@ -15,6 +15,10 @@ https://gobyexample.com/writing-files
 <!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
 
 ### Buffer Pool
+- [ ] NewPage(pageID)
+- [ ] FlushPage(pageID)
+- [ ] FlushAllPages()
+
 https://15445.courses.cs.cmu.edu/fall2018/project1/
 page table will record 
 pageId, pageIdxInBufferPool, dirtyFlag, pin
