@@ -122,7 +122,7 @@ func (b *BufferPool) getFreeFrameIdx() (int, error) {
 	}
 }
 
-// lock page3 before evict it
+// lock page before evict it
 func (b *BufferPool) evict(pageId uint32) {
 	meta := b.pageTable[pageId]
 	meta.mu.Lock()
@@ -142,7 +142,12 @@ func (b *BufferPool) UnpinPage(pageID uint32, isDirty bool) {
 	}
 }
 
-func (b BufferPool) NewPage() (Page, error) {
+type PageWithPageID struct {
+	page   Page
+	pageID uint32
+}
+
+func (b BufferPool) NewPage() (*PageWithPageID, error) {
 	pageID := b.pager.IncrementPageID()
 	frameIdx, err := b.getFreeFrameIdx()
 	if err != nil {
@@ -159,7 +164,11 @@ func (b BufferPool) NewPage() (Page, error) {
 
 	frame := b.frames[meta.frameIdx]
 	copy(frame, make([]byte, len(frame)))
-	return Page(frame), nil
+	result := &PageWithPageID{
+		page:   Page(frame),
+		pageID: pageID,
+	}
+	return result, nil
 }
 
 // What if flush and unpin page concurrently
@@ -168,4 +177,14 @@ func (b BufferPool) FlushPage(pageID uint32) {
 	frame := b.frames[meta.frameIdx]
 	b.pager.Write(int64(pageID)*int64(PAGE_SIZE), frame)
 	meta.isDirty = false
+}
+
+func (b BufferPool) FlushAllPage() {
+	for pageID, meta := range b.pageTable {
+		frame := b.frames[meta.frameIdx]
+		if meta.isDirty {
+			b.pager.Write(int64(pageID)*int64(PAGE_SIZE), frame)
+			meta.isDirty = false
+		}
+	}
 }
