@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 )
 
-type Page []byte
+type Page [PAGE_SIZE]byte
 
 type Pager interface {
-	Read(offset int64, bs []byte)
-	Write(offset int64, bs []byte)
+	Read(offset int64, page *Page)
+	Write(offset int64, page *Page)
 	IncrementPageID() uint32
 }
 
@@ -40,7 +40,7 @@ type BufferPool struct {
 	pageTable        map[uint32]*pageMeta
 	replacer         Replacer
 	freeFrameIndices chan int
-	frames           []Page
+	frames           []*Page
 	pager            Pager
 	maxPageNum       int
 	lock             sync.Mutex
@@ -53,21 +53,25 @@ func NewBufferPool(replacer Replacer, pager Pager, initPageNum, maxPageNum int) 
 		pageTable:        make(map[uint32]*pageMeta),
 		replacer:         replacer,
 		freeFrameIndices: freeFrameIndices,
-		frames:           []Page{},
+		frames:           []*Page{},
 		pager:            pager,
 		maxPageNum:       maxPageNum,
 	}
 
 	for i := 0; i < initPageNum; i++ {
-		bs := make([]byte, PAGE_SIZE)
-		b.frames = append(b.frames, bs)
+		bs := emptyPage()
+		b.frames = append(b.frames, &bs)
 		b.freeFrameIndices <- i
 	}
 
 	return b
 }
 
-func (b *BufferPool) FetchPage(pageID uint32) (Page, error) {
+func emptyPage() Page {
+	return [PAGE_SIZE]byte{}
+}
+
+func (b *BufferPool) FetchPage(pageID uint32) (*Page, error) {
 	if b.pageTable[pageID] != nil {
 		meta := b.pageTable[pageID]
 		meta.mu.RLock()
@@ -96,7 +100,7 @@ func (b *BufferPool) FetchPage(pageID uint32) (Page, error) {
 
 	frame := b.frames[meta.frameIdx]
 	b.pager.Read(int64(pageID)*int64(PAGE_SIZE), frame)
-	return Page(frame), nil
+	return frame, nil
 }
 
 func (b *BufferPool) getFreeFrameIdx() (int, error) {
@@ -115,9 +119,9 @@ func (b *BufferPool) getFreeFrameIdx() (int, error) {
 		}
 		b.lock.Lock()
 		defer b.lock.Unlock()
-		bs := make([]byte, PAGE_SIZE)
+		bs := emptyPage()
 		frameIdx := len(b.frames)
-		b.frames = append(b.frames, Page(bs))
+		b.frames = append(b.frames, &bs)
 		return frameIdx, nil
 	}
 }
@@ -143,7 +147,7 @@ func (b *BufferPool) UnpinPage(pageID uint32, isDirty bool) {
 }
 
 type PageWithPageID struct {
-	page   Page
+	page   *Page
 	pageID uint32
 }
 
@@ -162,10 +166,10 @@ func (b BufferPool) NewPage() (*PageWithPageID, error) {
 
 	b.replacer.Erase(pageID)
 
-	frame := b.frames[meta.frameIdx]
-	copy(frame, make([]byte, len(frame)))
+	bs := emptyPage()
+	b.frames[meta.frameIdx] = &bs
 	result := &PageWithPageID{
-		page:   Page(frame),
+		page:   b.frames[meta.frameIdx],
 		pageID: pageID,
 	}
 	return result, nil

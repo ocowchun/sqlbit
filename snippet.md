@@ -1,4 +1,6 @@
 ## TODO
+- [ ] transaction might be the key point for unpin page!
+- [ ] page directory
 - [ ] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
@@ -18,6 +20,7 @@ https://gobyexample.com/writing-files
 - [ ] NewPage(pageID)
 - [ ] FlushPage(pageID)
 - [ ] FlushAllPages()
+- [ ] where to run unpin?(btree?)
 
 https://15445.courses.cs.cmu.edu/fall2018/project1/
 page table will record 

@@ -33,6 +33,9 @@ func (n *DummyNoder) NewInternalNode(keys []uint32, children []uint32) *Internal
 	return node
 }
 
+func (n *DummyNoder) Clean(nodeId uint32, isDirty bool) {
+}
+
 func NewDummyTree() *BTree {
 	rootNode := &LeafNode{
 		id:     0,
