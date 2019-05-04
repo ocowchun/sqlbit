@@ -15,17 +15,23 @@ func (n *DummyNoder) add(node Node) uint32 {
 	return idx
 }
 
-func (n *DummyNoder) NewLeafNode(tuples []*Tuple) ILeafNode {
-	node := &LeafNode{tuples: tuples}
+func (n *DummyNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
+	bs := emptyPage()
+	node := &LeafNode{
+		tuples: tuples,
+		bytes:  &bs,
+	}
 	id := n.add(node)
 	node.SetID(id)
 	return node
 }
 
 func (n *DummyNoder) NewInternalNode(keys []uint32, children []uint32) *InternalNode {
+	bs := emptyPage()
 	node := &InternalNode{
 		keys:     keys,
 		children: children,
+		bytes:    &bs,
 	}
 
 	id := n.add(node)
@@ -44,8 +50,5 @@ func NewDummyTree() *BTree {
 	return &BTree{
 		rootNode:            rootNode,
 		capacityPerLeafNode: 2,
-		noder: &DummyNoder{
-			nodes: []Node{rootNode},
-		},
 	}
 }

@@ -194,7 +194,7 @@ func (n *FileNoder) add(node Node) uint32 {
 	return nodeId
 }
 
-func (n *FileNoder) NewLeafNode(tuples []*Tuple) ILeafNode {
+func (n *FileNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
 	node := &LeafNode{tuples: tuples}
 	id := n.add(node)
 	node.SetID(id)
@@ -210,6 +210,9 @@ func (n *FileNoder) NewInternalNode(keys []uint32, children []uint32) *InternalN
 	id := n.add(node)
 	node.SetID(id)
 	return node
+}
+
+func (n *FileNoder) Clean(nodeId uint32, isDirty bool) {
 }
 
 func (n *FileNoder) Save(tree *BTree) error {

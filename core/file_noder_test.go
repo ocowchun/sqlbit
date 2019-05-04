@@ -88,77 +88,78 @@ func createTuple(key uint32) *Tuple {
 
 	return &Tuple{key: key, value: append(bs, make([]byte, ROW_SIZE-4)...)}
 }
-func TestReadLeafNode(t *testing.T) {
-	removeTestFile()
-	fileName := getTestFileName()
-	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
-	w := bufio.NewWriter(f)
-	bs := make([]byte, 2)
-	binary.LittleEndian.PutUint16(bs, uint16(PAGE_TYPE_LEAF_NODE))
-	tuples := []*Tuple{createTuple(17), createTuple(42)}
-	numTuples := uint32(len(tuples))
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, numTuples)
-	bs = append(bs, b...)
 
-	for _, tuple := range tuples {
-		bs = append(bs, tuple.value...)
-	}
+// func TestReadLeafNode(t *testing.T) {
+// 	removeTestFile()
+// 	fileName := getTestFileName()
+// 	f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
+// 	w := bufio.NewWriter(f)
+// 	bs := make([]byte, 2)
+// 	binary.LittleEndian.PutUint16(bs, uint16(PAGE_TYPE_LEAF_NODE))
+// 	tuples := []*Tuple{createTuple(17), createTuple(42)}
+// 	numTuples := uint32(len(tuples))
+// 	b := make([]byte, 4)
+// 	binary.LittleEndian.PutUint32(b, numTuples)
+// 	bs = append(bs, b...)
 
-	bs = append(make([]byte, 4096), bs...)
-	_, err = w.Write(bs)
-	w.Flush()
-	f.Close()
-	pager, _ := OpenPager2(fileName)
-	fileNoder := NewFileNoder(pager)
+// 	for _, tuple := range tuples {
+// 		bs = append(bs, tuple.value...)
+// 	}
 
-	node := fileNoder.Read(1)
+// 	bs = append(make([]byte, 4096), bs...)
+// 	_, err = w.Write(bs)
+// 	w.Flush()
+// 	f.Close()
+// 	pager, _ := OpenPager2(fileName)
+// 	fileNoder := NewFileNoder(pager)
 
-	assert.Nil(t, err)
-	assert.Equal(t, "LeafNode", node.NodeType())
-	assert.Equal(t, uint32(1), node.ID())
-	assert.Equal(t, []uint32{uint32(17), uint32(42)}, node.Keys())
-	removeTestFile()
-}
+// 	node := fileNoder.Read(1)
 
-func TestAddNode(t *testing.T) {
-	removeTestFile()
-	fileName := getTestFileName()
-	pager, _ := OpenPager2(fileName)
+// 	assert.Nil(t, err)
+// 	assert.Equal(t, "LeafNode", node.NodeType())
+// 	assert.Equal(t, uint32(1), node.ID())
+// 	assert.Equal(t, []uint32{uint32(17), uint32(42)}, node.Keys())
+// 	removeTestFile()
+// }
 
-	nodeMap := make(map[uint32]Node)
-	fileNoder := &FileNoder{pager: pager, nodeMap: nodeMap}
+// func TestAddNode(t *testing.T) {
+// 	removeTestFile()
+// 	fileName := getTestFileName()
+// 	pager, _ := OpenPager2(fileName)
 
-	node := &InternalNode{}
-	nodeId := fileNoder.add(node)
+// 	nodeMap := make(map[uint32]Node)
+// 	fileNoder := &FileNoder{pager: pager, nodeMap: nodeMap}
 
-	assert.Equal(t, uint32(1), nodeId)
-	removeTestFile()
-}
+// 	node := &InternalNode{}
+// 	nodeId := fileNoder.add(node)
 
-func TestSaveBtreeToFile(t *testing.T) {
-	removeTestFile()
-	fileName := getTestFileName()
-	tuples := []*Tuple{}
-	prepareBtreeFile(fileName, tuples)
-	pager, _ := OpenPager2(fileName)
-	fileNoder := NewFileNoder(pager)
-	header, _ := fileNoder.ReadTableHeader()
-	rootNode := fileNoder.Read(header.rootPageNum)
-	tree := &BTree{
-		rootNode:            rootNode,
-		capacityPerLeafNode: ROW_PER_PAGE,
-		noder:               fileNoder,
-	}
+// 	assert.Equal(t, uint32(1), nodeId)
+// 	removeTestFile()
+// }
 
-	tree.Insert(1, createTuple(1).value)
-	tree.Insert(2, createTuple(2).value)
-	tree.Insert(3, createTuple(3).value)
-	fileNoder.Save(tree)
+// func TestSaveBtreeToFile(t *testing.T) {
+// 	removeTestFile()
+// 	fileName := getTestFileName()
+// 	tuples := []*Tuple{}
+// 	prepareBtreeFile(fileName, tuples)
+// 	pager, _ := OpenPager2(fileName)
+// 	fileNoder := NewFileNoder(pager)
+// 	header, _ := fileNoder.ReadTableHeader()
+// 	rootNode := fileNoder.Read(header.rootPageNum)
+// 	tree := &BTree{
+// 		rootNode:            rootNode,
+// 		capacityPerLeafNode: ROW_PER_PAGE,
+// 		noder:               fileNoder,
+// 	}
 
-	pager.Close()
-	pager, _ = OpenPager2(fileName)
-	tree2, _ := OpenBtree(NewFileNoder(pager))
-	assert.Equal(t, tree2.rootNode.Keys(), []uint32{1, 2, 3})
-	removeTestFile()
-}
+// 	tree.Insert(1, createTuple(1).value)
+// 	tree.Insert(2, createTuple(2).value)
+// 	tree.Insert(3, createTuple(3).value)
+// 	fileNoder.Save(tree)
+
+// 	pager.Close()
+// 	pager, _ = OpenPager2(fileName)
+// 	tree2, _ := OpenBtree(NewFileNoder(pager))
+// 	assert.Equal(t, tree2.rootNode.Keys(), []uint32{1, 2, 3})
+// 	removeTestFile()
+// }

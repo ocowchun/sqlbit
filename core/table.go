@@ -86,7 +86,7 @@ func OpenBtree(fileNoder *FileNoder) (*BTree, error) {
 	btree := &BTree{
 		rootNode:            rootNode,
 		capacityPerLeafNode: ROW_PER_PAGE,
-		noder:               fileNoder,
+		// noder:               fileNoder,
 	}
 	return btree, nil
 }
@@ -156,7 +156,7 @@ type Cursor struct {
 
 // * Create a cursor at the beginning of the table
 func newCursorFromStart(table *Table) *Cursor {
-	leafNode := table.btree.FirstLeafNode()
+	leafNode := table.btree.FirstLeafNode(table.fileNoder)
 	return &Cursor{
 		table:      table,
 		endOfTable: len(leafNode.Keys()) == 0,
@@ -189,14 +189,14 @@ func (c *Cursor) value() (*Row, error) {
 
 // Overwrite the row
 func (c *Cursor) write(row *Row) {
-	c.table.btree.Insert(row.Id(), row.Bytes())
+	c.table.btree.Insert(row.Id(), row.Bytes(), c.table.fileNoder)
 }
 
 // Advance the cursor to the next row
 func (c *Cursor) advance() {
 	c.cellNum = c.cellNum + 1
 	if c.cellNum >= LEAF_NODE_KEY_PER_PAGE {
-		newLeafNode := c.table.btree.NextLeafNode(c.leafNode)
+		newLeafNode := c.table.btree.NextLeafNode(c.leafNode, c.table.fileNoder)
 		if newLeafNode != nil {
 			c.cellNum = 0
 			c.leafNode = newLeafNode
