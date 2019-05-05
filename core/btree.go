@@ -175,7 +175,7 @@ func (t *BTree) RootNode(noder Noder) Node {
 func (t *BTree) String(noder Noder) string {
 	message := ""
 	nodes := []Node{}
-	node := t.rootNode
+	node := t.RootNode(noder)
 	for node != nil {
 		message = message + node.String() + "\n"
 		for _, nodeId := range node.Children() {
@@ -236,7 +236,7 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 				} else {
 					middleKey = result.middleKey
 					nodeID = result.newNodeId
-					if t.rootNode == parentNode {
+					if t.RootNode(noder) == parentNode {
 						t.newRoot(middleKey, []uint32{parentNode.id, nodeID}, noder)
 					}
 				}
@@ -292,7 +292,8 @@ func (t *BTree) Delete(key uint32) {
 }
 
 func (t *BTree) Find(key uint32, noder Noder) *Tuple {
-	nodes := t.lookup([]Node{t.rootNode}, key, noder)
+	rootNode := t.RootNode(noder)
+	nodes := t.lookup([]Node{rootNode}, key, noder)
 	leafNode := nodes[len(nodes)-1].(*LeafNode)
 	for _, tuple := range leafNode.Tuples() {
 		if tuple.key == key {
@@ -303,7 +304,7 @@ func (t *BTree) Find(key uint32, noder Noder) *Tuple {
 }
 
 func (t *BTree) First(noder Noder) *Tuple {
-	node := t.rootNode
+	node := t.RootNode(noder)
 	for node.NodeType() != "LeafNode" {
 		leftChild := node.Children()[0]
 		node = t.getNode(leftChild, noder)
@@ -314,7 +315,7 @@ func (t *BTree) First(noder Noder) *Tuple {
 
 // Return left most leaf node
 func (t *BTree) FirstLeafNode(noder Noder) *LeafNode {
-	node := t.rootNode
+	node := t.RootNode(noder)
 	for node.NodeType() != "LeafNode" {
 		leftChild := node.Children()[0]
 		node = t.getNode(leftChild, noder)
@@ -326,7 +327,7 @@ func (t *BTree) FirstLeafNode(noder Noder) *LeafNode {
 // Return node's right sibling
 func (t *BTree) NextLeafNode(node *LeafNode, noder Noder) *LeafNode {
 	key := node.Keys()[len(node.Keys())-1]
-	nodes := t.lookup([]Node{t.rootNode}, key+1, noder)
+	nodes := t.lookup([]Node{t.RootNode(noder)}, key+1, noder)
 	leafNode := nodes[len(nodes)-1].(*LeafNode)
 	return leafNode
 }

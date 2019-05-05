@@ -3,6 +3,7 @@ package core
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"testing"
 
@@ -85,8 +86,13 @@ func TestReadNodeFromNodeMap(t *testing.T) {
 func createTuple(key uint32) *Tuple {
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, key)
-
-	return &Tuple{key: key, value: append(bs, make([]byte, ROW_SIZE-4)...)}
+	username := fmt.Sprintf("user-%d", key)
+	email := fmt.Sprintf("%s@test.com", username)
+	row := NewRow(key, username, email)
+	return &Tuple{
+		key:   key,
+		value: row.Bytes(),
+	}
 }
 
 // func TestReadLeafNode(t *testing.T) {

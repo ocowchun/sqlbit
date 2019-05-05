@@ -1,6 +1,8 @@
 package core
 
-import "errors"
+import (
+	"errors"
+)
 
 type pageWithMeta struct {
 	page     *Page
@@ -9,12 +11,12 @@ type pageWithMeta struct {
 }
 
 type Transaction struct {
-	id         int
+	id         int32
 	pageTable  map[uint32]*pageWithMeta
 	bufferPool *BufferPool
 }
 
-func NewTransaction(id int, bufferPool *BufferPool) *Transaction {
+func NewTransaction(id int32, bufferPool *BufferPool) *Transaction {
 	return &Transaction{
 		id:         id,
 		pageTable:  make(map[uint32]*pageWithMeta),
@@ -23,7 +25,7 @@ func NewTransaction(id int, bufferPool *BufferPool) *Transaction {
 }
 
 // ID returns the transaction id.
-func (t *Transaction) ID() int {
+func (t *Transaction) ID() int32 {
 	return t.id
 }
 

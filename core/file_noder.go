@@ -212,9 +212,6 @@ func (n *FileNoder) NewInternalNode(keys []uint32, children []uint32) *InternalN
 	return node
 }
 
-func (n *FileNoder) Clean(nodeId uint32, isDirty bool) {
-}
-
 func (n *FileNoder) Save(tree *BTree) error {
 	b := serializeTableHeader(tree)
 	err := n.pager.FlushPage(0, b)
