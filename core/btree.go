@@ -128,9 +128,13 @@ func (n *LeafNode) SetTuples(newTuples []*Tuple) {
 	n.syncBytes()
 }
 
+const LEAF_NODE_NUM_TUPLES_OFFSET = PAGE_TYPE_SIZE
 const LEAF_NODE_FIRST_CHILD_OFFSET = LEAF_NODE_HEADER_SIZE
 
 func (n *LeafNode) syncBytes() {
+	numTuples := uint32(len(n.tuples))
+	copy(n.bytes[LEAF_NODE_NUM_TUPLES_OFFSET:LEAF_NODE_NUM_TUPLES_OFFSET+LEAF_NODE_NUM_TUPLE_SIZE], convertUint32ToBytes(numTuples))
+
 	offset := LEAF_NODE_FIRST_CHILD_OFFSET
 	end := LEAF_NODE_FIRST_CHILD_OFFSET
 	for _, tuple := range n.tuples {
@@ -162,7 +166,6 @@ type Noder interface {
 	Read(nodeId uint32) Node
 	NewLeafNode(tuples []*Tuple) *LeafNode
 	NewInternalNode(keys []uint32, children []uint32) *InternalNode
-	Clean(nodeId uint32, isDirty bool)
 }
 
 func (t *BTree) RootNode(noder Noder) Node {
@@ -195,7 +198,6 @@ func (t *BTree) newRoot(middleKey uint32, children []uint32, noder Noder) {
 	newRoot := noder.NewInternalNode([]uint32{middleKey}, children)
 	t.rootNode = newRoot
 	t.rootNodeID = newRoot.ID()
-	noder.Clean(t.rootNodeID, true)
 }
 
 // Find correct leaf L.
@@ -215,7 +217,6 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 
 	if len(keys) < t.capacityPerLeafNode {
 		leafNode.SetTuples(newTuples)
-		noder.Clean(leafNode.ID(), true)
 	} else {
 		midIdx := len(newTuples) / 2
 		leafNode.SetTuples(newTuples[0:midIdx])
