@@ -56,19 +56,20 @@ func TestPrepareInsert_withInvalidLength(t *testing.T) {
 	assert.Equal(t, "username too long", err.Error())
 }
 
-func TestExecuteInsert(t *testing.T) {
-	id := uint32(2147483647)
-	username := "harry"
-	email := "harry@hogwarts.edu"
-	rowToInsert := core.NewRow(id, username, email)
-	s := Statement{StatementType_Insert, rowToInsert}
-	table := &core.Table{}
+// func TestExecuteInsert(t *testing.T) {
+// 	id := uint32(2147483647)
+// 	username := "harry"
+// 	email := "harry@hogwarts.edu"
+// 	rowToInsert := core.NewRow(id, username, email)
+// 	s := Statement{StatementType_Insert, rowToInsert}
+// 	table := core.NewTable(core.NewDummyTree(), nil, nil)
 
-	result := ExecuteInsert(s, table)
+// 	result := ExecuteInsert(s, table)
 
-	assert.Equal(t, ExecuteResult_Success, result)
-	row := table.Pages()[0].Rows()[0]
-	assert.Equal(t, id, row.Id())
-	assert.Equal(t, "harry", row.Username())
-	assert.Equal(t, "harry@hogwarts.edu", row.Email())
-}
+// 	assert.Equal(t, ExecuteResult_Success, result)
+// 	rows, _ := table.Select()
+// 	row := rows[0]
+// 	assert.Equal(t, id, row.Id())
+// 	assert.Equal(t, "harry", row.Username())
+// 	assert.Equal(t, "harry@hogwarts.edu", row.Email())
+// }

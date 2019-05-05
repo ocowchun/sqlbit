@@ -2,7 +2,10 @@ package core
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"strings"
+	"sync/atomic"
 )
 
 const COLUMN_USERNAME_LENGTH = 32
@@ -59,89 +62,111 @@ func (r *Row) update(newRow *Row) {
 	r.email = newRow.email
 }
 
+const PAGE_TYPE_SIZE = 2
+const PAGE_TYPE_TABLE_HEADER = 0
+const PAGE_TYPE_INTERNAL_NODE = 1
+const PAGE_TYPE_LEAF_NODE = 2
+
 const PAGE_SIZE = 4096
 
 // 4 + 32 + 255
 const ROW_SIZE = 291
 const ROW_PER_PAGE = PAGE_SIZE / ROW_SIZE
 
-type Page struct {
-	rows [ROW_PER_PAGE]*Row
-}
-
-func (p *Page) Rows() [ROW_PER_PAGE]*Row {
-	return p.rows
-}
-
-func (p *Page) Bytes() []byte {
-	bs := []byte{}
-	for _, row := range p.rows {
-		if row.id == 0 {
-			break
-		}
-		bs = append(bs, row.Bytes()...)
-	}
-	return bs
-}
-
 const TABLE_MAX_PAGES = 100
 const TABLE_MAX_ROWS = TABLE_MAX_PAGES * ROW_PER_PAGE
 
 type Table struct {
-	numRows int
-	pages   [TABLE_MAX_PAGES]*Page
-	pager   *Pager
+	numRows           int
+	btree             *BTree
+	bufferPool        *BufferPool
+	lastTransactionID int32
 }
 
 func OpenTable(fileName string) (*Table, error) {
-	pager, _ := OpenPager(fileName)
-	fileSize, err := pager.FileSize()
+	replacer := &DummyReplacer{
+		frameIndices: []uint32{},
+		pinnedIdxMap: make(map[uint32]bool),
+	}
+	pager, err := NewFilePager(fileName)
 	if err != nil {
 		return nil, err
 	}
-	numRows := (fileSize/PAGE_SIZE)*14 + (fileSize%PAGE_SIZE)/ROW_SIZE
+
+	bufferPool := NewBufferPool(replacer, pager, 5, 100)
+	tableHeader, err := readTableHeader(bufferPool)
+	if err != nil {
+		return nil, err
+	}
+
+	btree := &BTree{
+		rootNodeID:          tableHeader.rootPageNum,
+		capacityPerLeafNode: ROW_PER_PAGE,
+	}
+
 	return &Table{
-		numRows: int(numRows),
-		pager:   pager,
+		btree:             btree,
+		lastTransactionID: int32(0),
+		bufferPool:        bufferPool,
 	}, nil
 }
 
-func (t *Table) CloseTable() error {
-	for pageNum, page := range t.pager.pages {
-		if page != nil {
-			err := t.pager.FlushPage(pageNum)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	err := t.pager.file.Close()
-	return err
+const TABLE_HEADER_ROOT_PAGE_NUM_SIZE = 4
+const TABLE_HEADER_HEADER_SIZE = PAGE_TYPE_SIZE + TABLE_HEADER_ROOT_PAGE_NUM_SIZE
+
+type TableHeader struct {
+	rootPageNum uint32
 }
 
-func (t *Table) rowSlot(rowNum int) (*Row, error) {
-	pageNum := rowNum / ROW_PER_PAGE
-	page, err := t.pager.ReadPage(pageNum)
+func readTableHeader(bufferPool *BufferPool) (*TableHeader, error) {
+	page, err := bufferPool.FetchPage(uint32(0))
+
 	if err != nil {
 		return nil, err
 	}
-	return page.rows[rowNum%ROW_PER_PAGE], nil
+	bs := page[:PAGE_TYPE_SIZE]
+	pageType := binary.LittleEndian.Uint16(bs)
+
+	if pageType != PAGE_TYPE_TABLE_HEADER {
+		return nil, errors.New("Incorrect page_type for Table Header")
+	}
+	from := PAGE_TYPE_SIZE
+	bs = page[from : from+TABLE_HEADER_ROOT_PAGE_NUM_SIZE]
+	rootPageNum := binary.LittleEndian.Uint32(bs)
+	return &TableHeader{rootPageNum: rootPageNum}, nil
+}
+
+func NewTable(btree *BTree, bufferPool *BufferPool) *Table {
+	return &Table{
+		btree:             btree,
+		bufferPool:        bufferPool,
+		lastTransactionID: int32(0),
+	}
+}
+
+func (t *Table) CloseTable() error {
+	t.bufferPool.FlushAllPage()
+	return nil
+}
+
+func (t *Table) newTransaction() *Transaction {
+	id := atomic.AddInt32(&t.lastTransactionID, 1)
+	return NewTransaction(id, t.bufferPool)
 }
 
 func (t *Table) InsertRow(newRow *Row) error {
-	c := newCursorFromEnd(t)
-	row, err := c.value()
-	if err != nil {
-		return err
-	}
-	row.update(newRow)
-	t.numRows = t.numRows + 1
+	tx := t.newTransaction()
+	c := newCursorFromStart(t, tx)
+	c.write(newRow)
+	tx.Commit()
 	return nil
 }
 
 func (t *Table) Select() ([]*Row, error) {
+	tx := t.newTransaction()
+
 	rows := []*Row{}
-	c := newCursorFromStart(t)
+	c := newCursorFromStart(t, tx)
 	for c.endOfTable != true {
 		row, err := c.value()
 		if err != nil {
@@ -150,6 +175,7 @@ func (t *Table) Select() ([]*Row, error) {
 		rows = append(rows, row)
 		c.advance()
 	}
+	tx.Commit()
 	return rows, nil
 }
 
@@ -157,50 +183,72 @@ func (t *Table) NumRows() int {
 	return t.numRows
 }
 
-func (t *Table) Pages() [TABLE_MAX_PAGES]*Page {
-	return t.pages
-}
-
 // Cursor represents a location in the table.
 type Cursor struct {
 	table      *Table
-	rowNum     int
+	noder      Noder
 	endOfTable bool
+	pageNum    int
+	cellNum    int
+
+	leafNode *LeafNode
+
+	// Deprecated
+	rowNum int
 }
 
 // * Create a cursor at the beginning of the table
-func newCursorFromStart(table *Table) *Cursor {
+func newCursorFromStart(table *Table, tx *Transaction) *Cursor {
+	noder := &TransactionNoder{transaction: tx}
+	leafNode := table.btree.FirstLeafNode(noder)
 	return &Cursor{
 		table:      table,
-		rowNum:     0,
-		endOfTable: table.numRows == 0,
+		noder:      noder,
+		endOfTable: len(leafNode.Keys()) == 0,
+		leafNode:   leafNode,
+		rowNum:     1,
 	}
 }
 
 // Create a cursor at the end of the table
-func newCursorFromEnd(table *Table) *Cursor {
-	return &Cursor{
-		table:      table,
-		rowNum:     table.numRows,
-		endOfTable: true,
-	}
-}
+// func newCursorFromEnd(table *Table) *Cursor {
+// 	return &Cursor{
+// 		table:      table,
+// 		rowNum:     table.numRows,
+// 		endOfTable: true,
+// 	}
+// }
 
 // Access the row the cursor is pointing to
 func (c *Cursor) value() (*Row, error) {
-	rowNum := c.rowNum
-	pageNum := rowNum / ROW_PER_PAGE
-	page, err := c.table.pager.ReadPage(pageNum)
-	if err != nil {
-		return nil, err
-	}
-	return page.rows[rowNum%ROW_PER_PAGE], nil
+	tuple := c.leafNode.tuples[c.cellNum]
+	bs := tuple.value
+	id := binary.LittleEndian.Uint32(bs)
+	replacer := strings.NewReplacer("\x00", "")
+	usrename := replacer.Replace(string(bs[4:COLUMN_USERNAME_LENGTH]))
+	email := replacer.Replace(string(bs[36:COLUMN_EMAIL_LENGTH]))
+
+	row := NewRow(id, usrename, email)
+	return row, nil
+}
+
+// Overwrite the row
+func (c *Cursor) write(row *Row) {
+	c.table.btree.Insert(row.Id(), row.Bytes(), c.noder)
 }
 
 // Advance the cursor to the next row
 func (c *Cursor) advance() {
-	c.rowNum = c.rowNum + 1
-	if c.rowNum >= c.table.numRows {
+	c.cellNum = c.cellNum + 1
+	if c.cellNum >= LEAF_NODE_KEY_PER_PAGE {
+		newLeafNode := c.table.btree.NextLeafNode(c.leafNode, c.noder)
+		if newLeafNode != nil {
+			c.cellNum = 0
+			c.leafNode = newLeafNode
+		} else {
+			c.endOfTable = true
+		}
+	} else if c.cellNum >= len(c.leafNode.Keys()) {
 		c.endOfTable = true
 	}
 }
