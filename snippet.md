@@ -1,10 +1,9 @@
 ## TODO
-- [ ] transaction might be the key point for unpin page!
+- [x] transaction might be the key point for unpin page!
 - [ ] page directory
-- [ ] buffer pool implementation
+- [x] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
-- [ ] refactor code, put fileNoder, pager2 their function in right place
 - [ ] add sibling pointer to leaf node
 
 
@@ -17,10 +16,10 @@ https://gobyexample.com/writing-files
 <!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
 
 ### Buffer Pool
-- [ ] NewPage(pageID)
-- [ ] FlushPage(pageID)
-- [ ] FlushAllPages()
-- [ ] where to run unpin?(btree?)
+- [x] NewPage(pageID)
+- [x] FlushPage(pageID)
+- [x] FlushAllPages()
+- [x] where to run unpin?(btree?)
 
 https://15445.courses.cs.cmu.edu/fall2018/project1/
 page table will record 
