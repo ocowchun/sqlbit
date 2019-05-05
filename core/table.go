@@ -62,6 +62,11 @@ func (r *Row) update(newRow *Row) {
 	r.email = newRow.email
 }
 
+const PAGE_TYPE_SIZE = 2
+const PAGE_TYPE_TABLE_HEADER = 0
+const PAGE_TYPE_INTERNAL_NODE = 1
+const PAGE_TYPE_LEAF_NODE = 2
+
 const PAGE_SIZE = 4096
 
 // 4 + 32 + 255
@@ -74,25 +79,8 @@ const TABLE_MAX_ROWS = TABLE_MAX_PAGES * ROW_PER_PAGE
 type Table struct {
 	numRows           int
 	btree             *BTree
-	pager2            *Pager2
-	fileNoder         *FileNoder
 	bufferPool        *BufferPool
 	lastTransactionID int32
-}
-
-func OpenBtree(fileNoder *FileNoder) (*BTree, error) {
-	header, err := fileNoder.ReadTableHeader()
-	if err != nil {
-		return nil, err
-	}
-
-	rootNode := fileNoder.Read(header.rootPageNum)
-	btree := &BTree{
-		rootNode:            rootNode,
-		capacityPerLeafNode: ROW_PER_PAGE,
-		// noder:               fileNoder,
-	}
-	return btree, nil
 }
 
 func OpenTable(fileName string) (*Table, error) {
@@ -123,6 +111,13 @@ func OpenTable(fileName string) (*Table, error) {
 	}, nil
 }
 
+const TABLE_HEADER_ROOT_PAGE_NUM_SIZE = 4
+const TABLE_HEADER_HEADER_SIZE = PAGE_TYPE_SIZE + TABLE_HEADER_ROOT_PAGE_NUM_SIZE
+
+type TableHeader struct {
+	rootPageNum uint32
+}
+
 func readTableHeader(bufferPool *BufferPool) (*TableHeader, error) {
 	page, err := bufferPool.FetchPage(uint32(0))
 
@@ -141,11 +136,10 @@ func readTableHeader(bufferPool *BufferPool) (*TableHeader, error) {
 	return &TableHeader{rootPageNum: rootPageNum}, nil
 }
 
-func NewTable(btree *BTree, pager *Pager2, fileNoder *FileNoder) *Table {
+func NewTable(btree *BTree, bufferPool *BufferPool) *Table {
 	return &Table{
 		btree:             btree,
-		pager2:            pager,
-		fileNoder:         fileNoder,
+		bufferPool:        bufferPool,
 		lastTransactionID: int32(0),
 	}
 }

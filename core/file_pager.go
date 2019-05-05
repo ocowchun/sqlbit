@@ -30,7 +30,7 @@ func NewFilePager(fileName string) (*FilePager, error) {
 	return pager, nil
 }
 
-func (p *FilePager) Read(offset int64, bs *Page) error {
+func (p *FilePager) Read(offset int64, bs *PageBody) error {
 	_, err := p.file.Seek(offset, 0)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func (p *FilePager) Read(offset int64, bs *Page) error {
 	return err
 }
 
-func (p *FilePager) Write(offset int64, bs *Page) error {
+func (p *FilePager) Write(offset int64, bs *PageBody) error {
 	_, err := p.file.Seek(offset, 0)
 	if err != nil {
 		return err

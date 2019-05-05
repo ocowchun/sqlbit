@@ -10,12 +10,12 @@ type DummyPager struct {
 	body []byte
 }
 
-func (d *DummyPager) Read(offset int64, bs *Page) error {
+func (d *DummyPager) Read(offset int64, bs *PageBody) error {
 	copy(bs[:], d.body[offset:offset+int64(PAGE_SIZE)])
 	return nil
 }
 
-func (d *DummyPager) Write(offset int64, bs *Page) error {
+func (d *DummyPager) Write(offset int64, bs *PageBody) error {
 	tmp := d.body
 	d.body = append(tmp[:offset], append(bs[:], tmp[offset+PAGE_SIZE:]...)...)
 	return nil
@@ -25,8 +25,8 @@ func (d *DummyPager) IncrementPageID() uint32 {
 	return uint32(len(d.body) / PAGE_SIZE)
 }
 
-func createPageFromSlice(slice []byte) Page {
-	page := emptyPage()
+func createPageFromSlice(slice []byte) PageBody {
+	page := emptyPageBody()
 	for i, b := range slice {
 		page[i] = b
 	}
@@ -38,7 +38,7 @@ func TestFetchPage(t *testing.T) {
 		frameIndices: []uint32{},
 		pinnedIdxMap: make(map[uint32]bool),
 	}
-	bs := emptyPage()
+	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 5, 100)
@@ -55,7 +55,7 @@ func TestFetchPageWhenNewFrame(t *testing.T) {
 		frameIndices: []uint32{},
 		pinnedIdxMap: make(map[uint32]bool),
 	}
-	bs := emptyPage()
+	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 0, 100)
@@ -64,7 +64,7 @@ func TestFetchPageWhenNewFrame(t *testing.T) {
 	page, err := pool.FetchPage(pageID)
 
 	assert.Nil(t, err)
-	assert.Equal(t, Page(expectedPage), *page)
+	assert.Equal(t, PageBody(expectedPage), *page)
 }
 
 func TestFetchPageWithEvictPage(t *testing.T) {
@@ -72,7 +72,7 @@ func TestFetchPageWithEvictPage(t *testing.T) {
 		frameIndices: []uint32{},
 		pinnedIdxMap: make(map[uint32]bool),
 	}
-	bs := emptyPage()
+	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 1, 1)
@@ -84,7 +84,7 @@ func TestFetchPageWithEvictPage(t *testing.T) {
 	page, err := pool.FetchPage(pageID2)
 
 	assert.Nil(t, err)
-	assert.Equal(t, Page(expectedPage), *page)
+	assert.Equal(t, PageBody(expectedPage), *page)
 }
 
 func TestFetchPageWithEvictPageFailed(t *testing.T) {

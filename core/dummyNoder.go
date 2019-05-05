@@ -16,10 +16,10 @@ func (n *DummyNoder) add(node Node) uint32 {
 }
 
 func (n *DummyNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
-	bs := emptyPage()
+	page := EmptyPage()
 	node := &LeafNode{
 		tuples: tuples,
-		bytes:  &bs,
+		page:   page,
 	}
 	id := n.add(node)
 	node.SetID(id)
@@ -27,11 +27,11 @@ func (n *DummyNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
 }
 
 func (n *DummyNoder) NewInternalNode(keys []uint32, children []uint32) *InternalNode {
-	bs := emptyPage()
+	page := EmptyPage()
 	node := &InternalNode{
 		keys:     keys,
 		children: children,
-		bytes:    &bs,
+		page:     page,
 	}
 
 	id := n.add(node)

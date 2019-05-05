@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/binary"
 	"fmt"
 	"sort"
 )
@@ -16,10 +17,18 @@ type Node interface {
 
 type InternalNode struct {
 	id       uint32
-	bytes    *Page
+	page     *Page
 	keys     []uint32
 	children []uint32
 }
+
+const INTERNAL_NODE_NUM_KEYS_SIZE = 4
+const INTERNAL_NODE_HEADER_SIZE = PAGE_TYPE_SIZE + INTERNAL_NODE_NUM_KEYS_SIZE
+const INTERNAL_NODE_CHILD_SIZE = 4
+const INTERNAL_NODE_KEY_SIZE = 4
+const INTERNAL_NODE_KEY_PER_PAGE = (PAGE_SIZE - INTERNAL_NODE_HEADER_SIZE - INTERNAL_NODE_CHILD_SIZE) / (INTERNAL_NODE_CHILD_SIZE + INTERNAL_NODE_KEY_SIZE)
+const INTERNAL_NODE_NUM_KEYS_OFFSET = PAGE_TYPE_SIZE
+const INTERNAL_NODE_FIRST_CHILD_OFFSET = INTERNAL_NODE_HEADER_SIZE
 
 func (n *InternalNode) ID() uint32 {
 	return n.id
@@ -54,27 +63,31 @@ func (n *InternalNode) String() string {
 func (n *InternalNode) Update(keys []uint32, children []uint32) {
 	n.keys = keys
 	n.children = children
+	n.page.MarkAsDirty()
 	n.syncBytes()
 }
 
-const INTERNAL_NODE_NUM_KEYS_OFFSET = PAGE_TYPE_SIZE
-const INTERNAL_NODE_FIRST_CHILD_OFFSET = INTERNAL_NODE_HEADER_SIZE
+func convertUint32ToBytes(num uint32) []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, num)
+	return b
+}
 
 func (n *InternalNode) syncBytes() {
 	numKeys := uint32(len(n.keys))
-	copy(n.bytes[INTERNAL_NODE_NUM_KEYS_OFFSET:INTERNAL_NODE_NUM_KEYS_OFFSET+INTERNAL_NODE_NUM_KEYS_SIZE], convertUint32ToBytes(numKeys))
+	copy(n.page.body[INTERNAL_NODE_NUM_KEYS_OFFSET:INTERNAL_NODE_NUM_KEYS_OFFSET+INTERNAL_NODE_NUM_KEYS_SIZE], convertUint32ToBytes(numKeys))
 	if len(n.children) > 0 {
 		offset := INTERNAL_NODE_FIRST_CHILD_OFFSET
 		end := INTERNAL_NODE_FIRST_CHILD_OFFSET + INTERNAL_NODE_CHILD_SIZE
-		copy(n.bytes[offset:end], convertUint32ToBytes(n.children[0]))
+		copy(n.page.body[offset:end], convertUint32ToBytes(n.children[0]))
 		for idx, key := range n.keys {
 			offset = end
 			end = end + INTERNAL_NODE_KEY_SIZE
-			copy(n.bytes[offset:end], convertUint32ToBytes(key))
+			copy(n.page.body[offset:end], convertUint32ToBytes(key))
 
 			offset = end
 			end = end + INTERNAL_NODE_CHILD_SIZE
-			copy(n.bytes[offset:end], convertUint32ToBytes(n.children[idx+1]))
+			copy(n.page.body[offset:end], convertUint32ToBytes(n.children[idx+1]))
 		}
 	}
 }
@@ -82,8 +95,15 @@ func (n *InternalNode) syncBytes() {
 type LeafNode struct {
 	id     uint32
 	tuples []*Tuple
-	bytes  *Page
+	page   *Page
 }
+
+const LEAF_NODE_NUM_TUPLE_SIZE = 4
+const LEAF_NODE_HEADER_SIZE = PAGE_TYPE_SIZE + LEAF_NODE_NUM_TUPLE_SIZE
+const LEAF_NODE_CHILD_SIZE = ROW_SIZE
+const LEAF_NODE_KEY_PER_PAGE = (PAGE_SIZE - LEAF_NODE_HEADER_SIZE) / LEAF_NODE_CHILD_SIZE
+const LEAF_NODE_NUM_TUPLES_OFFSET = PAGE_TYPE_SIZE
+const LEAF_NODE_FIRST_CHILD_OFFSET = LEAF_NODE_HEADER_SIZE
 
 func (n *LeafNode) ID() uint32 {
 	return n.id
@@ -123,24 +143,22 @@ func (n *LeafNode) String() string {
 	return message
 }
 
-func (n *LeafNode) SetTuples(newTuples []*Tuple) {
+func (n *LeafNode) Update(newTuples []*Tuple) {
 	n.tuples = newTuples
+	n.page.MarkAsDirty()
 	n.syncBytes()
 }
 
-const LEAF_NODE_NUM_TUPLES_OFFSET = PAGE_TYPE_SIZE
-const LEAF_NODE_FIRST_CHILD_OFFSET = LEAF_NODE_HEADER_SIZE
-
 func (n *LeafNode) syncBytes() {
 	numTuples := uint32(len(n.tuples))
-	copy(n.bytes[LEAF_NODE_NUM_TUPLES_OFFSET:LEAF_NODE_NUM_TUPLES_OFFSET+LEAF_NODE_NUM_TUPLE_SIZE], convertUint32ToBytes(numTuples))
+	copy(n.page.body[LEAF_NODE_NUM_TUPLES_OFFSET:LEAF_NODE_NUM_TUPLES_OFFSET+LEAF_NODE_NUM_TUPLE_SIZE], convertUint32ToBytes(numTuples))
 
 	offset := LEAF_NODE_FIRST_CHILD_OFFSET
 	end := LEAF_NODE_FIRST_CHILD_OFFSET
 	for _, tuple := range n.tuples {
 		offset = end
 		end = end + ROW_SIZE
-		copy(n.bytes[offset:end], tuple.value)
+		copy(n.page.body[offset:end], tuple.value)
 	}
 }
 
@@ -216,10 +234,10 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 	sort.Sort(ByKey(newTuples))
 
 	if len(keys) < t.capacityPerLeafNode {
-		leafNode.SetTuples(newTuples)
+		leafNode.Update(newTuples)
 	} else {
 		midIdx := len(newTuples) / 2
-		leafNode.SetTuples(newTuples[0:midIdx])
+		leafNode.Update(newTuples[0:midIdx])
 		leafNode2 := noder.NewLeafNode(newTuples[midIdx:])
 		nodeID := leafNode2.ID()
 		middleKey := newTuples[midIdx].key

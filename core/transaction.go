@@ -1,25 +1,24 @@
 package core
 
-import (
-	"errors"
-)
+type transactionPage struct {
+	page     *PageBody
+	snapshot *Page
+}
 
-type pageWithMeta struct {
-	page     *Page
-	snapshot Page
-	isDirty  bool
+func (tp *transactionPage) isDirty() bool {
+	return tp.snapshot.isDirty
 }
 
 type Transaction struct {
 	id         int32
-	pageTable  map[uint32]*pageWithMeta
+	pageTable  map[uint32]*transactionPage
 	bufferPool *BufferPool
 }
 
 func NewTransaction(id int32, bufferPool *BufferPool) *Transaction {
 	return &Transaction{
 		id:         id,
-		pageTable:  make(map[uint32]*pageWithMeta),
+		pageTable:  make(map[uint32]*transactionPage),
 		bufferPool: bufferPool,
 	}
 }
@@ -29,35 +28,66 @@ func (t *Transaction) ID() int32 {
 	return t.id
 }
 
+func EmptySnapshotPage() *Page {
+	body := emptyPageBody()
+	return &Page{
+		body:    &body,
+		isDirty: false,
+	}
+}
+
 func (t *Transaction) ReadPage(pageID uint32) (*Page, error) {
 	if t.pageTable[pageID] == nil {
 		page, err := t.bufferPool.FetchPage(pageID)
 		if err != nil {
 			return nil, err
 		}
-		t.pageTable[pageID] = &pageWithMeta{
+
+		body := emptyPageBody()
+		copy(body[:], page[:])
+		snapshot := &Page{
+			id:      pageID,
+			body:    &body,
+			isDirty: false,
+		}
+
+		t.pageTable[pageID] = &transactionPage{
 			page:     page,
-			snapshot: *page,
-			isDirty:  false,
+			snapshot: snapshot,
 		}
 	}
-	return &t.pageTable[pageID].snapshot, nil
+	return t.pageTable[pageID].snapshot, nil
 }
 
-func (t *Transaction) MarkAsDirty(pageID uint32) error {
-	if t.pageTable[pageID] == nil {
-		return errors.New("pageID not exists in pageTable")
+func (t *Transaction) NewPage() (*Page, error) {
+	page, err := t.bufferPool.NewPage()
+	pageID := page.id
+	body := page.body
+	if err != nil {
+		return nil, err
 	}
-	t.pageTable[pageID].isDirty = true
-	return nil
+
+	snapshotBody := emptyPageBody()
+	copy(snapshotBody[:], body[:])
+	snapshot := &Page{
+		id:      pageID,
+		body:    &snapshotBody,
+		isDirty: true,
+	}
+
+	t.pageTable[pageID] = &transactionPage{
+		page:     body,
+		snapshot: snapshot,
+	}
+	return t.pageTable[pageID].snapshot, nil
 }
 
 func (t *Transaction) Commit() {
-	for pageID, pm := range t.pageTable {
-		if pm.isDirty {
-			copy(t.pageTable[pageID].page[:], t.pageTable[pageID].snapshot[:])
+	for pageID, tp := range t.pageTable {
+		if tp.snapshot.isDirty {
+			copy(t.pageTable[pageID].page[:], t.pageTable[pageID].snapshot.body[:])
 		}
-		t.bufferPool.UnpinPage(pageID, pm.isDirty)
+		t.bufferPool.UnpinPage(pageID, tp.isDirty())
 	}
 }
 

@@ -18,7 +18,7 @@ func (n *TransactionNoder) Read(nodeID uint32) Node {
 		os.Exit(1)
 		return nil
 	}
-	bs := page[:PAGE_TYPE_SIZE]
+	bs := page.body[:PAGE_TYPE_SIZE]
 	pageType := binary.LittleEndian.Uint16(bs)
 
 	var node Node
@@ -35,46 +35,46 @@ func (n *TransactionNoder) Read(nodeID uint32) Node {
 	return node
 }
 
-func deserializeInternalNodeFromPage(nodeId uint32, page *Page) *InternalNode {
+func deserializeInternalNodeFromPage(nodeID uint32, page *Page) *InternalNode {
 	keys := []uint32{}
 	children := []uint32{}
 	from := PAGE_TYPE_SIZE
-	bs := page[from : from+INTERNAL_NODE_NUM_KEYS_SIZE]
+	bs := page.body[from : from+INTERNAL_NODE_NUM_KEYS_SIZE]
 	numKeys := binary.LittleEndian.Uint32(bs)
 	from = from + INTERNAL_NODE_NUM_KEYS_SIZE
 
-	bs = page[from : from+INTERNAL_NODE_CHILD_SIZE]
+	bs = page.body[from : from+INTERNAL_NODE_CHILD_SIZE]
 	children = append(children, binary.LittleEndian.Uint32(bs))
 	from = from + INTERNAL_NODE_CHILD_SIZE
 
 	for i := 0; i < int(numKeys); i++ {
-		bs := page[from : from+INTERNAL_NODE_KEY_SIZE]
+		bs := page.body[from : from+INTERNAL_NODE_KEY_SIZE]
 
 		keys = append(keys, binary.LittleEndian.Uint32(bs))
 		from = from + INTERNAL_NODE_KEY_SIZE
 
-		bs = page[from : from+INTERNAL_NODE_CHILD_SIZE]
+		bs = page.body[from : from+INTERNAL_NODE_CHILD_SIZE]
 		children = append(children, binary.LittleEndian.Uint32(bs))
 		from = from + INTERNAL_NODE_CHILD_SIZE
 	}
 
 	return &InternalNode{
-		id:       nodeId,
+		id:       nodeID,
 		keys:     keys,
 		children: children,
-		bytes:    page,
+		page:     page,
 	}
 }
 
 func deserializeLeafNodeFromPage(nodeId uint32, page *Page) *LeafNode {
 	tuples := []*Tuple{}
 	from := PAGE_TYPE_SIZE
-	bs := page[from : from+LEAF_NODE_NUM_TUPLE_SIZE]
+	bs := page.body[from : from+LEAF_NODE_NUM_TUPLE_SIZE]
 	numTuples := binary.LittleEndian.Uint32(bs)
 	from = from + INTERNAL_NODE_NUM_KEYS_SIZE
 
 	for i := 0; i < int(numTuples); i++ {
-		bs := page[from : from+ROW_SIZE]
+		bs := page.body[from : from+ROW_SIZE]
 		key := binary.LittleEndian.Uint32(bs[:4])
 		tuples = append(tuples, &Tuple{key: key, value: bs})
 		from = from + ROW_SIZE
@@ -83,39 +83,38 @@ func deserializeLeafNodeFromPage(nodeId uint32, page *Page) *LeafNode {
 	return &LeafNode{
 		id:     nodeId,
 		tuples: tuples,
-		bytes:  page,
+		page:   page,
 	}
 }
 
 func (n *TransactionNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
-	pageWithPageID, err := n.transaction.bufferPool.NewPage()
+	page, err := n.transaction.NewPage()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 		return nil
 	}
 	node := &LeafNode{
-		id:     pageWithPageID.pageID,
+		id:     page.id,
 		tuples: tuples,
-		bytes:  pageWithPageID.page,
+		page:   page,
 	}
 	node.syncBytes()
 	return node
 }
 
 func (n *TransactionNoder) NewInternalNode(keys []uint32, children []uint32) *InternalNode {
-	pageWithPageID, err := n.transaction.bufferPool.NewPage()
+	page, err := n.transaction.NewPage()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 		return nil
 	}
-
 	node := &InternalNode{
-		id:       pageWithPageID.pageID,
+		id:       page.id,
 		keys:     keys,
 		children: children,
-		bytes:    pageWithPageID.page,
+		page:     page,
 	}
 	node.syncBytes()
 	return node

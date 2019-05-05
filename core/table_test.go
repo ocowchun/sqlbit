@@ -67,3 +67,18 @@ func TestTableSelect(t *testing.T) {
 		assert.Equal(t, tuple.key, rows[idx].Id())
 	}
 }
+
+func TestTableInsertRow(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{}
+	prepareBtreeFile(fileName, tuples)
+	table, _ := OpenTable(fileName)
+	row := NewRow(1, "Harry", "harry@hogwarts.edu")
+
+	err := table.InsertRow(row)
+
+	assert.Nil(t, err)
+	rows, _ := table.Select()
+	assert.Equal(t, 1, len(rows))
+}
