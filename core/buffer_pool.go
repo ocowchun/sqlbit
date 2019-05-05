@@ -9,8 +9,8 @@ import (
 type Page [PAGE_SIZE]byte
 
 type Pager interface {
-	Read(offset int64, page *Page)
-	Write(offset int64, page *Page)
+	Read(offset int64, page *Page) error
+	Write(offset int64, page *Page) error
 	IncrementPageID() uint32
 }
 

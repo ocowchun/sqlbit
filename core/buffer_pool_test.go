@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,14 +33,15 @@ type DummyPager struct {
 	body []byte
 }
 
-func (d *DummyPager) Read(offset int64, bs *Page) {
+func (d *DummyPager) Read(offset int64, bs *Page) error {
 	copy(bs[:], d.body[offset:offset+int64(PAGE_SIZE)])
+	return nil
 }
 
-func (d *DummyPager) Write(offset int64, bs *Page) {
+func (d *DummyPager) Write(offset int64, bs *Page) error {
 	tmp := d.body
 	d.body = append(tmp[:offset], append(bs[:], tmp[offset+PAGE_SIZE:]...)...)
-	fmt.Println("yo")
+	return nil
 }
 
 func (d *DummyPager) IncrementPageID() uint32 {
