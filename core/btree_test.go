@@ -95,22 +95,3 @@ func TestBtree(t *testing.T) {
 	}
 	assert.Nil(t, tree.Find(10, noder))
 }
-
-// func TestOpenBtreeFromFile(t *testing.T) {
-// 	removeTestFile()
-// 	fileName := getTestFileName()
-// 	tuples := []*Tuple{createTuple(17), createTuple(42)}
-// 	prepareBtreeFile(fileName, tuples)
-// 	pager, _ := OpenPager2(fileName)
-// 	fileNoder := NewFileNoder(pager)
-// 	header, _ := fileNoder.ReadTableHeader()
-// 	rootNode := fileNoder.Read(header.rootPageNum)
-
-// 	tree := &BTree{
-// 		rootNode:            rootNode,
-// 		capacityPerLeafNode: ROW_PER_PAGE,
-// 	}
-
-// 	assert.Equal(t, tree.rootNode.Keys(), []uint32{17, 42})
-// 	removeTestFile()
-// }
