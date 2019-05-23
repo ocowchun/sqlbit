@@ -1,4 +1,7 @@
 ## TODO
+- [ ] a simple parser for where query https://github.com/alecthomas/participle#examples
+- [ ] Implements delete feature(btree and parser)
+- [ ] Split server and client (grpc?)
 - [x] transaction might be the key point for unpin page!
 - [ ] page directory
 - [x] buffer pool implementation
@@ -14,6 +17,13 @@ https://gobyexample.com/reading-files
 https://gobyexample.com/writing-files
 
 <!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
+
+### Parser
+only need to support two query
+```
+select * from users
+select * from users where id = xxx
+```
 
 ### Buffer Pool
 - [x] NewPage(pageID)
