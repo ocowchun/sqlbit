@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/alecthomas/participle"
 	"github.com/alecthomas/participle/lexer"
 )
@@ -29,11 +31,7 @@ type From struct {
 }
 
 type Expression struct {
-	And *AndCondition `@@ ("OR" @@)*`
-}
-
-type AndCondition struct {
-	Conditions []*Condition `@@ ( "AND" @@)*`
+	Condition *Condition `@@`
 }
 
 type Condition struct {
@@ -43,8 +41,24 @@ type Condition struct {
 }
 
 type Value struct {
-	String *string  `  @String`
+	Str    *string  `  @String`
 	Number *float64 `| @Number`
+}
+
+func (v *Value) Type() string {
+	if v.Str != nil {
+		return "string"
+	} else {
+		return "float64"
+	}
+}
+
+func (v *Value) String() string {
+	if v.Str != nil {
+		return *v.Str
+	} else {
+		return fmt.Sprintf("%f", *v.Number)
+	}
 }
 
 type Compare struct {
