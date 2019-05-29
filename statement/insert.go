@@ -32,7 +32,10 @@ func extractUserFromTokens(tokens []string) (Statement, error) {
 	}
 
 	row := core.NewRow(uint32(userID), username, email)
-	return Statement{StatementType_Insert, row}, nil
+	return Statement{
+		Type:        StatementType_Insert,
+		RowToInsert: row,
+	}, nil
 }
 
 func PrepareInsert(text string) (Statement, error) {

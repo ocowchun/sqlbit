@@ -52,20 +52,35 @@ func TestOpenTable(t *testing.T) {
 	assert.Equal(t, int(rootPageNum), int(table.btree.rootNodeID))
 }
 
-func TestTableSelect(t *testing.T) {
+func TestTableSeqScan(t *testing.T) {
 	removeTestFile()
 	fileName := getTestFileName()
 	tuples := []*Tuple{createTuple(17), createTuple(42)}
 	prepareBtreeFile(fileName, tuples)
 	table, err := OpenTable(fileName)
 
-	rows, err := table.Select()
+	rows, err := table.SeqScan(nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, len(tuples), len(rows))
 	for idx, tuple := range tuples {
 		assert.Equal(t, tuple.key, rows[idx].Id())
 	}
+}
+
+func TestTableSeqScanWithFilter(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{createTuple(17), createTuple(42)}
+	prepareBtreeFile(fileName, tuples)
+	table, err := OpenTable(fileName)
+	filter, _ := NewUint32Filter("id", uint32(17), "=")
+
+	rows, err := table.SeqScan(filter)
+
+	assert.Nil(t, err)
+	assert.Equal(t, len(rows), 1)
+	assert.Equal(t, uint32(17), rows[0].Id())
 }
 
 func TestTableInsertRow(t *testing.T) {
@@ -79,6 +94,6 @@ func TestTableInsertRow(t *testing.T) {
 	err := table.InsertRow(row)
 
 	assert.Nil(t, err)
-	rows, _ := table.Select()
+	rows, _ := table.SeqScan(nil)
 	assert.Equal(t, 1, len(rows))
 }

@@ -8,15 +8,30 @@ import (
 )
 
 type Filter interface {
-	Test(value interface{}) (bool, error)
+	Test(row *Row) (bool, error)
+}
+
+func GetValueFromRow(row *Row, columnName string) (interface{}, error) {
+	switch columnName {
+	case "id":
+		return row.Id(), nil
+	case "username":
+		return row.Username(), nil
+	case "email":
+		return row.Email(), nil
+	default:
+		message := fmt.Sprintf("column \"%s\" does not exist", columnName)
+		return nil, errors.New(message)
+	}
 }
 
 type Uint32Filter struct {
-	target   uint32
-	operator string
+	columnName string
+	target     uint32
+	operator   string
 }
 
-func NewUint32Filter(target uint32, operator string) (*Uint32Filter, error) {
+func NewUint32Filter(columnName string, target uint32, operator string) (*Uint32Filter, error) {
 	supportedOperators := []string{"<>", "<=", ">=", "=", "<", ">", "!="}
 	isSupportedOperator := false
 	for _, supportedOperator := range supportedOperators {
@@ -27,8 +42,9 @@ func NewUint32Filter(target uint32, operator string) (*Uint32Filter, error) {
 
 	if isSupportedOperator {
 		return &Uint32Filter{
-			target:   target,
-			operator: operator,
+			columnName: columnName,
+			target:     target,
+			operator:   operator,
 		}, nil
 	} else {
 		message := fmt.Sprintf("invalid input syntax for uint32: %s", operator)
@@ -37,7 +53,12 @@ func NewUint32Filter(target uint32, operator string) (*Uint32Filter, error) {
 
 }
 
-func (f *Uint32Filter) Test(value interface{}) (bool, error) {
+func (f *Uint32Filter) Test(row *Row) (bool, error) {
+	value, err := GetValueFromRow(row, f.columnName)
+	if err != nil {
+		return false, err
+	}
+
 	val := value.(uint32)
 	switch f.operator {
 	case "<>":
@@ -60,11 +81,13 @@ func (f *Uint32Filter) Test(value interface{}) (bool, error) {
 }
 
 type StringFilter struct {
-	target   string
-	operator string
+	columnName string
+	target     string
+	operator   string
 }
 
-func NewStringFilter(target string, operator string) (*StringFilter, error) {
+func NewStringFilter(columnName string, target string, operator string) (*StringFilter, error) {
+
 	supportedOperators := []string{"<>", "=", "!="}
 	isSupportedOperator := false
 	for _, supportedOperator := range supportedOperators {
@@ -75,8 +98,9 @@ func NewStringFilter(target string, operator string) (*StringFilter, error) {
 
 	if isSupportedOperator {
 		return &StringFilter{
-			target:   target,
-			operator: operator,
+			columnName: columnName,
+			target:     target,
+			operator:   operator,
 		}, nil
 	} else {
 		message := fmt.Sprintf("invalid input syntax for string: %s", operator)
@@ -85,7 +109,12 @@ func NewStringFilter(target string, operator string) (*StringFilter, error) {
 
 }
 
-func (f *StringFilter) Test(value interface{}) (bool, error) {
+func (f *StringFilter) Test(row *Row) (bool, error) {
+	value, err := GetValueFromRow(row, f.columnName)
+	if err != nil {
+		return false, err
+	}
+
 	val := value.(string)
 	switch f.operator {
 	case "<>":
@@ -136,9 +165,9 @@ func NewFilter(whereExpression *parser.Expression, schema map[string]string) (Fi
 	operator := whereExpression.Condition.Compare.Operator
 	if columnType == "uint32" {
 		target := condVal.(*float64)
-		return NewUint32Filter(uint32(*target), operator)
+		return NewUint32Filter(columnName, uint32(*target), operator)
 	} else {
 		target := condVal.(*string)
-		return NewStringFilter(*target, operator)
+		return NewStringFilter(columnName, *target, operator)
 	}
 }

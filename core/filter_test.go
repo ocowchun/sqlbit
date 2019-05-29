@@ -37,7 +37,8 @@ func TestNewFilter(t *testing.T) {
 	filter, err := NewFilter(whereExpression, schema)
 
 	assert.Nil(t, err)
-	result, _ := filter.Test(uint32(44))
+	row := NewRow(uint32(1), "username", "email")
+	result, _ := filter.Test(row)
 	assert.Equal(t, false, result)
 }
 
