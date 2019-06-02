@@ -61,7 +61,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 	assert.Equal(t, tuple1.value, node.page.body[from:from+ROW_SIZE])
 }
 
-func TestBtree(t *testing.T) {
+func createDummyBtree() (*BTree, *DummyNoder) {
 	page := EmptyPage()
 	rootNode := &LeafNode{
 		id:     0,
@@ -75,6 +75,11 @@ func TestBtree(t *testing.T) {
 		rootNodeID:          0,
 		capacityPerLeafNode: 2,
 	}
+	return tree, noder
+}
+
+func TestBtreeInsert(t *testing.T) {
+	tree, noder := createDummyBtree()
 
 	tree.Insert(1, []byte("a"), noder)
 	tree.Insert(2, []byte("b"), noder)
@@ -94,4 +99,42 @@ func TestBtree(t *testing.T) {
 		assert.NotNil(t, tree.Find(uint32(i+1), noder), noder)
 	}
 	assert.Nil(t, tree.Find(10, noder))
+}
+
+func TestBtreeNextLeafNode(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+	node := tree.FirstLeafNode(noder)
+
+	leafNode := tree.NextLeafNode(node, noder)
+
+	assert.Equal(t, leafNode.Keys(), []uint32{2})
+}
+
+func TestBtreeFindLeafNode(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+
+	leafNode := tree.FindLeafNode(uint32(3), noder)
+
+	assert.Equal(t, leafNode.Keys(), []uint32{3, 4})
+}
+
+func TestBtreePrevLeafNode(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+	node := tree.FindLeafNode(uint32(3), noder)
+
+	leafNode := tree.PrevLeafNode(node, noder)
+
+	assert.Equal(t, leafNode.Keys(), []uint32{2})
 }

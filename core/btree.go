@@ -309,10 +309,18 @@ func (t *BTree) Delete(key uint32) {
 
 }
 
-func (t *BTree) Find(key uint32, noder Noder) *Tuple {
+func (t *BTree) FindLeafNode(key uint32, noder Noder) *LeafNode {
 	rootNode := t.RootNode(noder)
 	nodes := t.lookup([]Node{rootNode}, key, noder)
-	leafNode := nodes[len(nodes)-1].(*LeafNode)
+	return nodes[len(nodes)-1].(*LeafNode)
+}
+
+func (t *BTree) Find(key uint32, noder Noder) *Tuple {
+	leafNode := t.FindLeafNode(key, noder)
+	if leafNode == nil {
+		return nil
+	}
+
 	for _, tuple := range leafNode.Tuples() {
 		if tuple.key == key {
 			return tuple
@@ -346,6 +354,14 @@ func (t *BTree) FirstLeafNode(noder Noder) *LeafNode {
 func (t *BTree) NextLeafNode(node *LeafNode, noder Noder) *LeafNode {
 	key := node.Keys()[len(node.Keys())-1]
 	nodes := t.lookup([]Node{t.RootNode(noder)}, key+1, noder)
+	leafNode := nodes[len(nodes)-1].(*LeafNode)
+	return leafNode
+}
+
+// Return node's left sibling
+func (t *BTree) PrevLeafNode(node *LeafNode, noder Noder) *LeafNode {
+	key := node.Keys()[0]
+	nodes := t.lookup([]Node{t.RootNode(noder)}, key-1, noder)
 	leafNode := nodes[len(nodes)-1].(*LeafNode)
 	return leafNode
 }
