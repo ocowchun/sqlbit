@@ -211,6 +211,51 @@ func (t *Table) SeqScan(filter Filter) ([]*Row, error) {
 	return rows, nil
 }
 
+func (t *Table) IndexScan(indexCondition *IndexCondition, filter Filter) ([]*Row, error) {
+	tx := t.newTransaction()
+
+	rows := []*Row{}
+
+	c := newCursorForIndexScan(t, tx, indexCondition)
+
+	// TODO: how to end this loop with indexCond?
+	// == : end when false
+	// >, >=, <, <=, <>
+	for c.endOfTable != true {
+		row, err := c.value()
+		if err != nil {
+			return nil, err
+		}
+		if filter == nil {
+			rows = append(rows, row)
+		} else {
+			pass, err := filter.Test(row)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if pass {
+				rows = append(rows, row)
+			}
+		}
+
+		c.advance()
+	}
+
+	for c.endOfTable != true {
+		row, err := c.value()
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+		c.advance()
+	}
+
+	tx.Commit()
+	return rows, nil
+}
+
 func (t *Table) NumRows() int {
 	return t.numRows
 }
@@ -224,7 +269,7 @@ type Cursor struct {
 	cellNum    int
 	direction  string
 	leafNode   *LeafNode
-
+	indexCond  *IndexCondition
 	// Deprecated
 	rowNum int
 }
@@ -240,6 +285,37 @@ func newCursorFromStart(table *Table, tx *Transaction) *Cursor {
 		leafNode:   leafNode,
 		rowNum:     1,
 		direction:  "next",
+	}
+}
+
+// * Create a cursor at the beginning of the table
+func newCursorForIndexScan(table *Table, tx *Transaction, indexCondition *IndexCondition) *Cursor {
+	key := indexCondition.Target
+
+	operator := indexCondition.Operator
+	direction := "next"
+	if operator == "<" || operator == "<=" {
+		direction = "prev"
+	}
+
+	noder := &TransactionNoder{transaction: tx}
+	leafNode := table.btree.FindLeafNode(key, noder)
+	cellNum := 0
+	for idx, tupleKey := range leafNode.Keys() {
+		if tupleKey == key {
+			cellNum = idx
+			break
+		}
+	}
+	return &Cursor{
+		table:      table,
+		noder:      noder,
+		endOfTable: len(leafNode.Keys()) == 0,
+		leafNode:   leafNode,
+		rowNum:     1,
+		cellNum:    cellNum,
+		direction:  direction,
+		indexCond:  indexCondition,
 	}
 }
 
@@ -270,12 +346,17 @@ func (c *Cursor) write(row *Row) {
 	c.table.btree.Insert(row.Id(), row.Bytes(), c.noder)
 }
 
-// Advance the cursor to the next row
+// Advance the cursor to move its position forward.
 func (c *Cursor) advance() {
 	c.cellNum = c.cellNum + 1
 
 	if c.cellNum >= LEAF_NODE_KEY_PER_PAGE {
-		newLeafNode := c.table.btree.NextLeafNode(c.leafNode, c.noder)
+		var newLeafNode *LeafNode
+		if c.direction == "next" {
+			newLeafNode = c.table.btree.NextLeafNode(c.leafNode, c.noder)
+		} else {
+			newLeafNode = c.table.btree.PrevLeafNode(c.leafNode, c.noder)
+		}
 		if newLeafNode != nil {
 			c.cellNum = 0
 			c.leafNode = newLeafNode
@@ -284,5 +365,11 @@ func (c *Cursor) advance() {
 		}
 	} else if c.cellNum >= len(c.leafNode.Keys()) {
 		c.endOfTable = true
+	}
+
+	if c.indexCond != nil && c.endOfTable == false {
+		row, _ := c.value()
+		shouldEnd, _ := c.indexCond.ShouldEnd(row.Id())
+		c.endOfTable = shouldEnd
 	}
 }

@@ -1,14 +1,26 @@
 ## TODO
-- [ ] a simple parser for where query https://github.com/alecthomas/participle#examples
+- [ ] fix bug `select * from users where id < 2`
+- [ ] add index scan
 - [ ] Implements delete feature(btree and parser)
 - [ ] Split server and client (grpc?)
+- [x] a simple parser for where query https://github.com/alecthomas/participle#examples
 - [x] transaction might be the key point for unpin page!
 - [ ] page directory
 - [x] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
 - [ ] add sibling pointer to leaf node
+- [ ] implement tupleid (decouple with page ordering)
+- [ ] allow create custom table
+- [ ] add system catalog
 
+
+## Problems
+### How to handle index scan + filter
+```sql
+select * from users
+where id > 10 AND name = 'harry'
+```
 
 insert 1 cstack foo@bar.com
 insert 2147483647 ocowchun ocowchun@bar.com

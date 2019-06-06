@@ -97,3 +97,22 @@ func TestTableInsertRow(t *testing.T) {
 	rows, _ := table.SeqScan(nil)
 	assert.Equal(t, 1, len(rows))
 }
+
+func TestTableIndexScan(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{createTuple(17), createTuple(42)}
+	prepareBtreeFile(fileName, tuples)
+	table, err := OpenTable(fileName)
+	indexCondition := &IndexCondition{
+		ColumnName: "id",
+		Target:     17,
+		Operator:   "=",
+	}
+
+	rows, err := table.IndexScan(indexCondition, nil)
+
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(rows))
+	assert.Equal(t, uint32(17), rows[0].Id())
+}
