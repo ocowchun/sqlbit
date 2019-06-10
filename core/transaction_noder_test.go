@@ -30,9 +30,9 @@ func TestMain(m *testing.M) {
 
 func TestTxNoderReadInternalNode(t *testing.T) {
 	page := EmptyPage()
-	page_type_bytes := make([]byte, 2)
-	binary.LittleEndian.PutUint16(page_type_bytes, uint16(PAGE_TYPE_INTERNAL_NODE))
-	copy(page.body[0:2], page_type_bytes)
+	pageTypeBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(pageTypeBytes, uint16(PAGE_TYPE_INTERNAL_NODE))
+	copy(page.body[0:2], pageTypeBytes)
 	internalNode := &InternalNode{
 		keys:     []uint32{},
 		children: []uint32{},
@@ -60,9 +60,9 @@ func TestTxNoderReadInternalNode(t *testing.T) {
 
 func TestTxNoderReadLeafNode(t *testing.T) {
 	page := EmptyPage()
-	page_type_bytes := make([]byte, 2)
-	binary.LittleEndian.PutUint16(page_type_bytes, uint16(PAGE_TYPE_LEAF_NODE))
-	copy(page.body[0:2], page_type_bytes)
+	pageTypeBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(pageTypeBytes, uint16(PAGE_TYPE_LEAF_NODE))
+	copy(page.body[0:2], pageTypeBytes)
 	leafNode := &LeafNode{
 		tuples: []*Tuple{},
 		page:   page,
@@ -70,7 +70,7 @@ func TestTxNoderReadLeafNode(t *testing.T) {
 	row1 := NewRow(1, "Harry", "harry@hogwarts.edu")
 	tuple1 := &Tuple{row1.Id(), row1.Bytes()}
 	tuples := []*Tuple{tuple1}
-	leafNode.Update(tuples)
+	leafNode.Update(tuples, leafNode.PrevNodeID(), leafNode.NextNodeID())
 	page0 := emptyPageBody()
 	pager := &DummyPager{body: append(page0[:], leafNode.page.body[:]...)}
 	replacer := NewDummyReplacer()

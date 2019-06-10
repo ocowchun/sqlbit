@@ -41,7 +41,7 @@ func deserializeInternalNodeFromPage(nodeID uint32, page *Page) *InternalNode {
 	from := PAGE_TYPE_SIZE
 	bs := page.body[from : from+INTERNAL_NODE_NUM_KEYS_SIZE]
 	numKeys := binary.LittleEndian.Uint32(bs)
-	from = from + INTERNAL_NODE_NUM_KEYS_SIZE
+	from = INTERNAL_NODE_FIRST_CHILD_OFFSET
 
 	bs = page.body[from : from+INTERNAL_NODE_CHILD_SIZE]
 	children = append(children, binary.LittleEndian.Uint32(bs))
@@ -71,7 +71,7 @@ func deserializeLeafNodeFromPage(nodeId uint32, page *Page) *LeafNode {
 	from := PAGE_TYPE_SIZE
 	bs := page.body[from : from+LEAF_NODE_NUM_TUPLE_SIZE]
 	numTuples := binary.LittleEndian.Uint32(bs)
-	from = from + INTERNAL_NODE_NUM_KEYS_SIZE
+	from = LEAF_NODE_FIRST_CHILD_OFFSET
 
 	for i := 0; i < int(numTuples); i++ {
 		bs := page.body[from : from+ROW_SIZE]
