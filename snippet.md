@@ -1,4 +1,5 @@
 ## TODO
+- [ ] add sibling pointer to leaf node
 - [ ] fix bug `select * from users where id < 2`
 - [ ] add index scan
 - [ ] Implements delete feature(btree and parser)
@@ -9,7 +10,6 @@
 - [x] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
-- [ ] add sibling pointer to leaf node
 - [ ] implement tupleid (decouple with page ordering)
 - [ ] allow create custom table
 - [ ] add system catalog

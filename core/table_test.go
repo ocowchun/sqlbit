@@ -30,6 +30,10 @@ func prepareBtreeFile(fileName string, tuples []*Tuple) uint32 {
 	b = make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, numTuples)
 	bs = append(bs, b...)
+
+	b = make([]byte, LEAF_NODE_HEADER_SIZE-(4+2))
+	bs = append(bs, b...)
+
 	for _, tuple := range tuples {
 		bs = append(bs, tuple.value...)
 	}

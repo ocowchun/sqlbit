@@ -65,6 +65,9 @@ func createDBFile(fileName string) error {
 	binary.LittleEndian.PutUint32(b, numTuples)
 	bs = append(bs, b...)
 
+	b = make([]byte, LEAF_NODE_HEADER_SIZE-(4+2))
+	bs = append(bs, b...)
+
 	_, err = w.Write(bs)
 	if err != nil {
 		return err

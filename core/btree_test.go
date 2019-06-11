@@ -52,13 +52,17 @@ func TestLeafNodeUpdate(t *testing.T) {
 	row1 := NewRow(1, "Harry", "harry@hogwarts.edu")
 	tuple1 := &Tuple{row1.Id(), row1.Bytes()}
 	tuples := []*Tuple{tuple1}
+	prevNodeID := uint32(9)
+	nextNodeID := uint32(42)
 
-	node.Update(tuples)
+	node.Update(tuples, prevNodeID, nextNodeID)
 
 	assert.Equal(t, tuples, node.tuples)
 	assert.Equal(t, true, node.page.isDirty)
 	from := LEAF_NODE_FIRST_CHILD_OFFSET
 	assert.Equal(t, tuple1.value, node.page.body[from:from+ROW_SIZE])
+	assert.Equal(t, prevNodeID, node.PrevNodeID())
+	assert.Equal(t, nextNodeID, node.NextNodeID())
 }
 
 func createDummyBtree() (*BTree, *DummyNoder) {
@@ -101,6 +105,21 @@ func TestBtreeInsert(t *testing.T) {
 	assert.Nil(t, tree.Find(10, noder))
 }
 
+func TestBtreeInsertWithSibling(t *testing.T) {
+	tree, noder := createDummyBtree()
+
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+	tree.Insert(5, []byte("f"), noder)
+
+	leafNode := tree.FindLeafNode(3, noder)
+	nextNode := noder.Read(leafNode.NextNodeID())
+	assert.Equal(t, []uint32{4, 5}, nextNode.Keys())
+	prevNode := noder.Read(leafNode.PrevNodeID())
+	assert.Equal(t, []uint32{2}, prevNode.Keys())
+}
 func TestBtreeNextLeafNode(t *testing.T) {
 	tree, noder := createDummyBtree()
 	tree.Insert(1, []byte("a"), noder)
@@ -137,4 +156,34 @@ func TestBtreePrevLeafNode(t *testing.T) {
 	leafNode := tree.PrevLeafNode(node, noder)
 
 	assert.Equal(t, leafNode.Keys(), []uint32{2})
+}
+
+func TestFindLeafNodeByCondition(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+	tree.Insert(5, []byte("d"), noder)
+
+	leafNode, idx := tree.FindLeafNodeByCondition(uint32(1), "=", noder)
+	assert.Equal(t, uint32(1), leafNode.Keys()[idx])
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(2), ">=", noder)
+	assert.Equal(t, uint32(2), leafNode.Keys()[idx])
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(3), "<=", noder)
+	assert.Equal(t, uint32(3), leafNode.Keys()[idx])
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(3), "<", noder)
+	assert.Equal(t, uint32(2), leafNode.Keys()[idx])
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(3), ">", noder)
+	assert.Equal(t, uint32(4), leafNode.Keys()[idx])
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(5), ">", noder)
+	assert.Equal(t, -1, idx)
+
+	leafNode, idx = tree.FindLeafNodeByCondition(uint32(1), "<", noder)
+	assert.Equal(t, -1, idx)
 }
