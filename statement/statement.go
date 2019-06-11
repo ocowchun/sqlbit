@@ -2,6 +2,7 @@ package statement
 
 import (
 	"github.com/ocowchun/sqlbit/core"
+	"github.com/ocowchun/sqlbit/parser"
 )
 
 type StatementType int
@@ -15,6 +16,7 @@ const (
 type Statement struct {
 	Type        StatementType
 	RowToInsert *core.Row
+	QueryPlan   *parser.Select
 }
 
 type ExecuteResult int

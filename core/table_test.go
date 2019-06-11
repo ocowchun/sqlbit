@@ -30,6 +30,10 @@ func prepareBtreeFile(fileName string, tuples []*Tuple) uint32 {
 	b = make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, numTuples)
 	bs = append(bs, b...)
+
+	b = make([]byte, LEAF_NODE_HEADER_SIZE-(4+2))
+	bs = append(bs, b...)
+
 	for _, tuple := range tuples {
 		bs = append(bs, tuple.value...)
 	}
@@ -52,20 +56,35 @@ func TestOpenTable(t *testing.T) {
 	assert.Equal(t, int(rootPageNum), int(table.btree.rootNodeID))
 }
 
-func TestTableSelect(t *testing.T) {
+func TestTableSeqScan(t *testing.T) {
 	removeTestFile()
 	fileName := getTestFileName()
 	tuples := []*Tuple{createTuple(17), createTuple(42)}
 	prepareBtreeFile(fileName, tuples)
 	table, err := OpenTable(fileName)
 
-	rows, err := table.Select()
+	rows, err := table.SeqScan(nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, len(tuples), len(rows))
 	for idx, tuple := range tuples {
 		assert.Equal(t, tuple.key, rows[idx].Id())
 	}
+}
+
+func TestTableSeqScanWithFilter(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{createTuple(17), createTuple(42)}
+	prepareBtreeFile(fileName, tuples)
+	table, err := OpenTable(fileName)
+	filter, _ := NewUint32Filter("id", uint32(17), "=")
+
+	rows, err := table.SeqScan(filter)
+
+	assert.Nil(t, err)
+	assert.Equal(t, len(rows), 1)
+	assert.Equal(t, uint32(17), rows[0].Id())
 }
 
 func TestTableInsertRow(t *testing.T) {
@@ -79,6 +98,25 @@ func TestTableInsertRow(t *testing.T) {
 	err := table.InsertRow(row)
 
 	assert.Nil(t, err)
-	rows, _ := table.Select()
+	rows, _ := table.SeqScan(nil)
 	assert.Equal(t, 1, len(rows))
+}
+
+func TestTableIndexScan(t *testing.T) {
+	removeTestFile()
+	fileName := getTestFileName()
+	tuples := []*Tuple{createTuple(17), createTuple(42)}
+	prepareBtreeFile(fileName, tuples)
+	table, err := OpenTable(fileName)
+	indexCondition := &IndexCondition{
+		ColumnName: "id",
+		Target:     17,
+		Operator:   "=",
+	}
+
+	rows, err := table.IndexScan(indexCondition, nil)
+
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(rows))
+	assert.Equal(t, uint32(17), rows[0].Id())
 }

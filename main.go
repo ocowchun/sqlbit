@@ -35,10 +35,12 @@ func prepareStatement(text string) (statement.Statement, error) {
 		return statement.PrepareInsert(text)
 	}
 	if strings.HasPrefix(text, "select") {
-		return statement.Statement{statement.StatementType_Select, nil}, nil
+		return statement.PrepareSelect(text)
 	}
 	if strings.HasPrefix(text, "delete") {
-		return statement.Statement{statement.StatementType_Delete, nil}, nil
+		return statement.Statement{
+			Type: statement.StatementType_Delete,
+		}, nil
 	}
 	return statement.Statement{}, errors.New("UNRECOGNIZED_STATEMENT")
 }

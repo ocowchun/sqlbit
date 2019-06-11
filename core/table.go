@@ -162,11 +162,42 @@ func (t *Table) InsertRow(newRow *Row) error {
 	return nil
 }
 
-func (t *Table) Select() ([]*Row, error) {
+func (t *Table) Schema() map[string]string {
+	return map[string]string{
+		"id":       "uint32",
+		"username": "string",
+		"email":    "string",
+	}
+}
+
+func (t *Table) SeqScan(filter Filter) ([]*Row, error) {
 	tx := t.newTransaction()
 
 	rows := []*Row{}
+
 	c := newCursorFromStart(t, tx)
+	for c.endOfTable != true {
+		row, err := c.value()
+		if err != nil {
+			return nil, err
+		}
+		if filter == nil {
+			rows = append(rows, row)
+		} else {
+			pass, err := filter.Test(row)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if pass {
+				rows = append(rows, row)
+			}
+		}
+
+		c.advance()
+	}
+
 	for c.endOfTable != true {
 		row, err := c.value()
 		if err != nil {
@@ -175,6 +206,49 @@ func (t *Table) Select() ([]*Row, error) {
 		rows = append(rows, row)
 		c.advance()
 	}
+
+	tx.Commit()
+	return rows, nil
+}
+
+func (t *Table) IndexScan(indexCondition *IndexCondition, filter Filter) ([]*Row, error) {
+	tx := t.newTransaction()
+
+	rows := []*Row{}
+
+	c := newCursorForIndexScan(t, tx, indexCondition)
+
+	for c.endOfTable != true {
+		row, err := c.value()
+		if err != nil {
+			return nil, err
+		}
+		if filter == nil {
+			rows = append(rows, row)
+		} else {
+			pass, err := filter.Test(row)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if pass {
+				rows = append(rows, row)
+			}
+		}
+
+		c.advance()
+	}
+
+	for c.endOfTable != true {
+		row, err := c.value()
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+		c.advance()
+	}
+
 	tx.Commit()
 	return rows, nil
 }
@@ -190,11 +264,9 @@ type Cursor struct {
 	endOfTable bool
 	pageNum    int
 	cellNum    int
-
-	leafNode *LeafNode
-
-	// Deprecated
-	rowNum int
+	direction  string
+	leafNode   *LeafNode
+	indexCond  *IndexCondition
 }
 
 // * Create a cursor at the beginning of the table
@@ -206,18 +278,33 @@ func newCursorFromStart(table *Table, tx *Transaction) *Cursor {
 		noder:      noder,
 		endOfTable: len(leafNode.Keys()) == 0,
 		leafNode:   leafNode,
-		rowNum:     1,
+		direction:  "next",
 	}
 }
 
-// Create a cursor at the end of the table
-// func newCursorFromEnd(table *Table) *Cursor {
-// 	return &Cursor{
-// 		table:      table,
-// 		rowNum:     table.numRows,
-// 		endOfTable: true,
-// 	}
-// }
+// * Create a cursor at the beginning of the table
+func newCursorForIndexScan(table *Table, tx *Transaction, indexCondition *IndexCondition) *Cursor {
+	key := indexCondition.Target
+
+	operator := indexCondition.Operator
+	direction := "next"
+	if operator == "<" || operator == "<=" {
+		direction = "prev"
+	}
+
+	noder := &TransactionNoder{transaction: tx}
+	leafNode, idx := table.btree.FindLeafNodeByCondition(key, operator, noder)
+
+	return &Cursor{
+		table:      table,
+		noder:      noder,
+		endOfTable: idx == -1,
+		leafNode:   leafNode,
+		cellNum:    idx,
+		direction:  direction,
+		indexCond:  indexCondition,
+	}
+}
 
 // Access the row the cursor is pointing to
 func (c *Cursor) value() (*Row, error) {
@@ -237,11 +324,17 @@ func (c *Cursor) write(row *Row) {
 	c.table.btree.Insert(row.Id(), row.Bytes(), c.noder)
 }
 
-// Advance the cursor to the next row
+// Advance the cursor to move its position forward.
 func (c *Cursor) advance() {
 	c.cellNum = c.cellNum + 1
+
 	if c.cellNum >= LEAF_NODE_KEY_PER_PAGE {
-		newLeafNode := c.table.btree.NextLeafNode(c.leafNode, c.noder)
+		var newLeafNode *LeafNode
+		if c.direction == "next" {
+			newLeafNode = c.table.btree.NextLeafNode(c.leafNode, c.noder)
+		} else {
+			newLeafNode = c.table.btree.PrevLeafNode(c.leafNode, c.noder)
+		}
 		if newLeafNode != nil {
 			c.cellNum = 0
 			c.leafNode = newLeafNode
@@ -250,5 +343,11 @@ func (c *Cursor) advance() {
 		}
 	} else if c.cellNum >= len(c.leafNode.Keys()) {
 		c.endOfTable = true
+	}
+
+	if c.indexCond != nil && c.endOfTable == false {
+		row, _ := c.value()
+		shouldEnd, _ := c.indexCond.ShouldEnd(row.Id())
+		c.endOfTable = shouldEnd
 	}
 }

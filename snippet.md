@@ -1,11 +1,26 @@
 ## TODO
-- [x] transaction might be the key point for unpin page!
+- [ ] Implements delete feature(btree and parser)
 - [ ] page directory
+- [ ] implement tupleid (decouple with page ordering)
+- [ ] allow create custom table
+- [ ] add system catalog
+- [ ] Split server and client (grpc?)
+- [x] a simple parser for where query https://github.com/alecthomas/participle#examples
+- [x] transaction might be the key point for unpin page!
 - [x] buffer pool implementation
 - [x] load btree from file
 - [x] write tuple to btree
-- [ ] add sibling pointer to leaf node
+- [x] add sibling pointer to leaf node
+- [x] fix bug `select * from users where id < 2`
+- [x] add index scan
 
+
+## Problems
+### How to handle index scan + filter
+```sql
+select * from users
+where id > 10 AND name = 'harry'
+```
 
 insert 1 cstack foo@bar.com
 insert 2147483647 ocowchun ocowchun@bar.com
@@ -14,6 +29,13 @@ https://gobyexample.com/reading-files
 https://gobyexample.com/writing-files
 
 <!-- return (*page)(unsafe.Pointer(&b[id*pgid(db.pageSize)])) -->
+
+### Parser
+only need to support two query
+```
+select * from users
+select * from users where id = xxx
+```
 
 ### Buffer Pool
 - [x] NewPage(pageID)
