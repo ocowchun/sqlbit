@@ -452,18 +452,12 @@ func (t *BTree) FirstLeafNode(noder Noder) *LeafNode {
 
 // Return node's right sibling
 func (t *BTree) NextLeafNode(node *LeafNode, noder Noder) *LeafNode {
-	key := node.Keys()[len(node.Keys())-1]
-	nodes := t.lookup([]Node{t.RootNode(noder)}, key+1, noder)
-	leafNode := nodes[len(nodes)-1].(*LeafNode)
-	return leafNode
+	return node.NextNode(noder)
 }
 
 // Return node's left sibling
 func (t *BTree) PrevLeafNode(node *LeafNode, noder Noder) *LeafNode {
-	key := node.Keys()[0]
-	nodes := t.lookup([]Node{t.RootNode(noder)}, key-1, noder)
-	leafNode := nodes[len(nodes)-1].(*LeafNode)
-	return leafNode
+	return node.PrevNode(noder)
 }
 
 // return node and it's ancestor nodes

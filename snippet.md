@@ -1,18 +1,18 @@
 ## TODO
-- [ ] add sibling pointer to leaf node
-- [ ] fix bug `select * from users where id < 2`
-- [ ] add index scan
 - [ ] Implements delete feature(btree and parser)
-- [ ] Split server and client (grpc?)
-- [x] a simple parser for where query https://github.com/alecthomas/participle#examples
-- [x] transaction might be the key point for unpin page!
 - [ ] page directory
-- [x] buffer pool implementation
-- [x] load btree from file
-- [x] write tuple to btree
 - [ ] implement tupleid (decouple with page ordering)
 - [ ] allow create custom table
 - [ ] add system catalog
+- [ ] Split server and client (grpc?)
+- [x] a simple parser for where query https://github.com/alecthomas/participle#examples
+- [x] transaction might be the key point for unpin page!
+- [x] buffer pool implementation
+- [x] load btree from file
+- [x] write tuple to btree
+- [x] add sibling pointer to leaf node
+- [x] fix bug `select * from users where id < 2`
+- [x] add index scan
 
 
 ## Problems

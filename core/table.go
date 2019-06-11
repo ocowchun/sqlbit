@@ -218,9 +218,6 @@ func (t *Table) IndexScan(indexCondition *IndexCondition, filter Filter) ([]*Row
 
 	c := newCursorForIndexScan(t, tx, indexCondition)
 
-	// TODO: how to end this loop with indexCond?
-	// == : end when false
-	// >, >=, <, <=, <>
 	for c.endOfTable != true {
 		row, err := c.value()
 		if err != nil {
@@ -270,8 +267,6 @@ type Cursor struct {
 	direction  string
 	leafNode   *LeafNode
 	indexCond  *IndexCondition
-	// Deprecated
-	rowNum int
 }
 
 // * Create a cursor at the beginning of the table
@@ -283,7 +278,6 @@ func newCursorFromStart(table *Table, tx *Transaction) *Cursor {
 		noder:      noder,
 		endOfTable: len(leafNode.Keys()) == 0,
 		leafNode:   leafNode,
-		rowNum:     1,
 		direction:  "next",
 	}
 }
@@ -299,34 +293,18 @@ func newCursorForIndexScan(table *Table, tx *Transaction, indexCondition *IndexC
 	}
 
 	noder := &TransactionNoder{transaction: tx}
-	leafNode := table.btree.FindLeafNode(key, noder)
-	cellNum := 0
-	for idx, tupleKey := range leafNode.Keys() {
-		if tupleKey == key {
-			cellNum = idx
-			break
-		}
-	}
+	leafNode, idx := table.btree.FindLeafNodeByCondition(key, operator, noder)
+
 	return &Cursor{
 		table:      table,
 		noder:      noder,
-		endOfTable: len(leafNode.Keys()) == 0,
+		endOfTable: idx == -1,
 		leafNode:   leafNode,
-		rowNum:     1,
-		cellNum:    cellNum,
+		cellNum:    idx,
 		direction:  direction,
 		indexCond:  indexCondition,
 	}
 }
-
-// Create a cursor at the end of the table
-// func newCursorFromEnd(table *Table) *Cursor {
-// 	return &Cursor{
-// 		table:      table,
-// 		rowNum:     table.numRows,
-// 		endOfTable: true,
-// 	}
-// }
 
 // Access the row the cursor is pointing to
 func (c *Cursor) value() (*Row, error) {
