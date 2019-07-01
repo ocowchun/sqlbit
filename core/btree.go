@@ -284,6 +284,10 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 		midIdx := len(newTuples) / 2
 		leafNode2 := noder.NewLeafNode(newTuples[midIdx:])
 		leafNode2.Update(newTuples[midIdx:], leafNode.ID(), leafNode.NextNodeID())
+		nextNode := leafNode.NextNode(noder)
+		if nextNode != nil {
+			nextNode.Update(nextNode.Tuples(), leafNode2.ID(), nextNode.NextNodeID())
+		}
 		leafNode.Update(newTuples[0:midIdx], leafNode.PrevNodeID(), leafNode2.ID())
 		nodeID := leafNode2.ID()
 		middleKey := newTuples[midIdx].key
