@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -10,7 +11,7 @@ type TransactionNoder struct {
 	transaction *Transaction
 }
 
-func (n *TransactionNoder) Read(nodeID uint32) Node {
+func (n *TransactionNoder) Read(nodeID PageID) Node {
 	page, err := n.transaction.ReadPage(nodeID)
 	// TODO: handle error with better way later
 	if err != nil {
@@ -35,16 +36,22 @@ func (n *TransactionNoder) Read(nodeID uint32) Node {
 	return node
 }
 
-func deserializeInternalNodeFromPage(nodeID uint32, page *Page) *InternalNode {
+func convertBytesToPageID(bs []byte) PageID {
+	var num PageID
+	binary.Read(bytes.NewReader(bs), binary.LittleEndian, &num)
+	return num
+}
+
+func deserializeInternalNodeFromPage(nodeID PageID, page *Page) *InternalNode {
 	keys := []uint32{}
-	children := []uint32{}
+	children := []PageID{}
 	from := PAGE_TYPE_SIZE
 	bs := page.body[from : from+INTERNAL_NODE_NUM_KEYS_SIZE]
 	numKeys := binary.LittleEndian.Uint32(bs)
 	from = INTERNAL_NODE_FIRST_CHILD_OFFSET
 
 	bs = page.body[from : from+INTERNAL_NODE_CHILD_SIZE]
-	children = append(children, binary.LittleEndian.Uint32(bs))
+	children = append(children, convertBytesToPageID(bs))
 	from = from + INTERNAL_NODE_CHILD_SIZE
 
 	for i := 0; i < int(numKeys); i++ {
@@ -54,7 +61,7 @@ func deserializeInternalNodeFromPage(nodeID uint32, page *Page) *InternalNode {
 		from = from + INTERNAL_NODE_KEY_SIZE
 
 		bs = page.body[from : from+INTERNAL_NODE_CHILD_SIZE]
-		children = append(children, binary.LittleEndian.Uint32(bs))
+		children = append(children, convertBytesToPageID(bs))
 		from = from + INTERNAL_NODE_CHILD_SIZE
 	}
 
@@ -66,7 +73,7 @@ func deserializeInternalNodeFromPage(nodeID uint32, page *Page) *InternalNode {
 	}
 }
 
-func deserializeLeafNodeFromPage(nodeId uint32, page *Page) *LeafNode {
+func deserializeLeafNodeFromPage(nodeId PageID, page *Page) *LeafNode {
 	tuples := []*Tuple{}
 	from := PAGE_TYPE_SIZE
 	bs := page.body[from : from+LEAF_NODE_NUM_TUPLE_SIZE]
@@ -95,15 +102,17 @@ func (n *TransactionNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
 		return nil
 	}
 	node := &LeafNode{
-		id:     page.id,
-		tuples: tuples,
-		page:   page,
+		id:         page.id,
+		tuples:     tuples,
+		page:       page,
+		nextNodeID: -1,
+		prevNodeID: -1,
 	}
 	node.syncBytes()
 	return node
 }
 
-func (n *TransactionNoder) NewInternalNode(keys []uint32, children []uint32) *InternalNode {
+func (n *TransactionNoder) NewInternalNode(keys []uint32, children []PageID) *InternalNode {
 	page, err := n.transaction.NewPage()
 	if err != nil {
 		fmt.Println(err)

@@ -24,12 +24,12 @@ func TestInternalNodeUpdate(t *testing.T) {
 	page := EmptyPage()
 	node := &InternalNode{
 		keys:     []uint32{},
-		children: []uint32{},
+		children: []PageID{},
 		page:     page,
 	}
 
 	keys := []uint32{5}
-	children := []uint32{4, 5}
+	children := []PageID{4, 5}
 
 	node.Update(keys, children)
 
@@ -52,8 +52,8 @@ func TestLeafNodeUpdate(t *testing.T) {
 	row1 := NewRow(1, "Harry", "harry@hogwarts.edu")
 	tuple1 := &Tuple{row1.Id(), row1.Bytes()}
 	tuples := []*Tuple{tuple1}
-	prevNodeID := uint32(9)
-	nextNodeID := uint32(42)
+	prevNodeID := PageID(9)
+	nextNodeID := PageID(42)
 
 	node.Update(tuples, prevNodeID, nextNodeID)
 
@@ -68,9 +68,11 @@ func TestLeafNodeUpdate(t *testing.T) {
 func createDummyBtree() (*BTree, *DummyNoder) {
 	page := EmptyPage()
 	rootNode := &LeafNode{
-		id:     0,
-		tuples: []*Tuple{},
-		page:   page,
+		id:         0,
+		tuples:     []*Tuple{},
+		page:       page,
+		nextNodeID: -1,
+		prevNodeID: -1,
 	}
 	noder := &DummyNoder{
 		nodes: []Node{rootNode},
@@ -181,9 +183,9 @@ func TestFindLeafNodeByCondition(t *testing.T) {
 	leafNode, idx = tree.FindLeafNodeByCondition(uint32(3), ">", noder)
 	assert.Equal(t, uint32(4), leafNode.Keys()[idx])
 
-	leafNode, idx = tree.FindLeafNodeByCondition(uint32(5), ">", noder)
+	_, idx = tree.FindLeafNodeByCondition(uint32(5), ">", noder)
 	assert.Equal(t, -1, idx)
 
-	leafNode, idx = tree.FindLeafNodeByCondition(uint32(1), "<", noder)
+	_, idx = tree.FindLeafNodeByCondition(uint32(1), "<", noder)
 	assert.Equal(t, -1, idx)
 }

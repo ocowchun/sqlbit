@@ -21,8 +21,8 @@ func (d *DummyPager) Write(offset int64, bs *PageBody) error {
 	return nil
 }
 
-func (d *DummyPager) IncrementPageID() uint32 {
-	return uint32(len(d.body) / PAGE_SIZE)
+func (d *DummyPager) IncrementPageID() PageID {
+	return PageID(len(d.body) / PAGE_SIZE)
 }
 
 func createPageFromSlice(slice []byte) PageBody {
@@ -35,14 +35,14 @@ func createPageFromSlice(slice []byte) PageBody {
 
 func TestFetchPage(t *testing.T) {
 	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
+		frameIndices: []PageID{},
+		pinnedIdxMap: make(map[PageID]bool),
 	}
 	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 5, 100)
-	pageID := uint32(1)
+	pageID := PageID(1)
 
 	page, err := pool.FetchPage(pageID)
 
@@ -52,14 +52,14 @@ func TestFetchPage(t *testing.T) {
 
 func TestFetchPageWhenNewFrame(t *testing.T) {
 	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
+		frameIndices: []PageID{},
+		pinnedIdxMap: make(map[PageID]bool),
 	}
 	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 0, 100)
-	pageID := uint32(1)
+	pageID := PageID(1)
 
 	page, err := pool.FetchPage(pageID)
 
@@ -69,16 +69,16 @@ func TestFetchPageWhenNewFrame(t *testing.T) {
 
 func TestFetchPageWithEvictPage(t *testing.T) {
 	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
+		frameIndices: []PageID{},
+		pinnedIdxMap: make(map[PageID]bool),
 	}
 	bs := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(bs[:], expectedPage[:]...)}
 	pool := NewBufferPool(replacer, pager, 1, 1)
-	pageID1 := uint32(0)
+	pageID1 := PageID(0)
 	pool.FetchPage(pageID1)
-	pageID2 := uint32(1)
+	pageID2 := PageID(1)
 
 	pool.UnpinPage(pageID1, false)
 	page, err := pool.FetchPage(pageID2)
@@ -89,16 +89,16 @@ func TestFetchPageWithEvictPage(t *testing.T) {
 
 func TestFetchPageWithEvictPageFailed(t *testing.T) {
 	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
+		frameIndices: []PageID{},
+		pinnedIdxMap: make(map[PageID]bool),
 	}
 	bs := make([]byte, 4096)
 	expectedPage := append([]byte{1, 2, 3, 4, 5}, make([]byte, PAGE_SIZE-5)...)
 	pager := &DummyPager{body: append(bs, expectedPage...)}
 	pool := NewBufferPool(replacer, pager, 1, 1)
-	pageID1 := uint32(0)
+	pageID1 := PageID(0)
 	pool.FetchPage(pageID1)
-	pageID2 := uint32(1)
+	pageID2 := PageID(1)
 
 	page, err := pool.FetchPage(pageID2)
 
@@ -108,13 +108,13 @@ func TestFetchPageWithEvictPageFailed(t *testing.T) {
 
 func TestFlushPage(t *testing.T) {
 	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
+		frameIndices: []PageID{},
+		pinnedIdxMap: make(map[PageID]bool),
 	}
 	bs := make([]byte, 4096)
 	pager := &DummyPager{body: bs}
 	pool := NewBufferPool(replacer, pager, 1, 1)
-	pageID := uint32(0)
+	pageID := PageID(0)
 	page, _ := pool.FetchPage(pageID)
 
 	for i, b := range []byte{1, 2, 3, 4, 5} {

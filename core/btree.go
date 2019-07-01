@@ -1,25 +1,26 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"sort"
 )
 
 type Node interface {
-	ID() uint32
-	SetID(id uint32)
+	ID() PageID
+	SetID(id PageID)
 	Keys() []uint32
-	Children() []uint32
+	Children() []PageID
 	String() string
 	NodeType() string
 }
 
 type InternalNode struct {
-	id       uint32
+	id       PageID
 	page     *Page
 	keys     []uint32
-	children []uint32
+	children []PageID
 }
 
 const INTERNAL_NODE_NUM_KEYS_SIZE = 4
@@ -30,11 +31,11 @@ const INTERNAL_NODE_KEY_PER_PAGE = (PAGE_SIZE - INTERNAL_NODE_HEADER_SIZE - INTE
 const INTERNAL_NODE_NUM_KEYS_OFFSET = PAGE_TYPE_SIZE
 const INTERNAL_NODE_FIRST_CHILD_OFFSET = INTERNAL_NODE_HEADER_SIZE
 
-func (n *InternalNode) ID() uint32 {
+func (n *InternalNode) ID() PageID {
 	return n.id
 }
 
-func (n *InternalNode) SetID(id uint32) {
+func (n *InternalNode) SetID(id PageID) {
 	n.id = id
 }
 
@@ -42,7 +43,7 @@ func (n *InternalNode) Keys() []uint32 {
 	return n.keys
 }
 
-func (n *InternalNode) Children() []uint32 {
+func (n *InternalNode) Children() []PageID {
 	return n.children
 }
 
@@ -60,7 +61,7 @@ func (n *InternalNode) String() string {
 	return message
 }
 
-func (n *InternalNode) Update(keys []uint32, children []uint32) {
+func (n *InternalNode) Update(keys []uint32, children []PageID) {
 	n.keys = keys
 	n.children = children
 	n.page.MarkAsDirty()
@@ -73,13 +74,19 @@ func convertUint32ToBytes(num uint32) []byte {
 	return b
 }
 
+func convertPageIDToBytes(num PageID) []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, num)
+	return buf.Bytes()
+}
+
 func (n *InternalNode) syncBytes() {
 	numKeys := uint32(len(n.keys))
 	copy(n.page.body[INTERNAL_NODE_NUM_KEYS_OFFSET:INTERNAL_NODE_NUM_KEYS_OFFSET+INTERNAL_NODE_NUM_KEYS_SIZE], convertUint32ToBytes(numKeys))
 	if len(n.children) > 0 {
 		offset := INTERNAL_NODE_FIRST_CHILD_OFFSET
 		end := INTERNAL_NODE_FIRST_CHILD_OFFSET + INTERNAL_NODE_CHILD_SIZE
-		copy(n.page.body[offset:end], convertUint32ToBytes(n.children[0]))
+		copy(n.page.body[offset:end], convertPageIDToBytes(n.children[0]))
 		for idx, key := range n.keys {
 			offset = end
 			end = end + INTERNAL_NODE_KEY_SIZE
@@ -87,15 +94,15 @@ func (n *InternalNode) syncBytes() {
 
 			offset = end
 			end = end + INTERNAL_NODE_CHILD_SIZE
-			copy(n.page.body[offset:end], convertUint32ToBytes(n.children[idx+1]))
+			copy(n.page.body[offset:end], convertPageIDToBytes(n.children[idx+1]))
 		}
 	}
 }
 
 type LeafNode struct {
-	id         uint32
-	nextNodeID uint32
-	prevNodeID uint32
+	id         PageID
+	nextNodeID PageID
+	prevNodeID PageID
 	tuples     []*Tuple
 	page       *Page
 }
@@ -116,39 +123,39 @@ const LEAF_NODE_FIRST_CHILD_OFFSET = LEAF_NODE_HEADER_SIZE
 const LEAF_NODE_CHILD_SIZE = ROW_SIZE
 const LEAF_NODE_KEY_PER_PAGE = (PAGE_SIZE - LEAF_NODE_HEADER_SIZE) / LEAF_NODE_CHILD_SIZE
 
-func (n *LeafNode) ID() uint32 {
+func (n *LeafNode) ID() PageID {
 	return n.id
 }
 
 // TODO handle nil
-func (n *LeafNode) NextNodeID() uint32 {
+func (n *LeafNode) NextNodeID() PageID {
 	return n.nextNodeID
 }
 
-func (n *LeafNode) PrevNodeID() uint32 {
+func (n *LeafNode) PrevNodeID() PageID {
 	return n.prevNodeID
 }
 
 func (n *LeafNode) NextNode(noder Noder) *LeafNode {
-	if n.nextNodeID == 0 {
+	if n.nextNodeID < 0 {
 		return nil
 	}
 	return noder.Read(n.nextNodeID).(*LeafNode)
 }
 
 func (n *LeafNode) PrevNode(noder Noder) *LeafNode {
-	if n.prevNodeID == 0 {
+	if n.prevNodeID < 0 {
 		return nil
 	}
 	return noder.Read(n.prevNodeID).(*LeafNode)
 }
 
-func (n *LeafNode) SetID(id uint32) {
+func (n *LeafNode) SetID(id PageID) {
 	n.id = id
 }
 
-func (n *LeafNode) Children() []uint32 {
-	return []uint32{}
+func (n *LeafNode) Children() []PageID {
+	return []PageID{}
 }
 
 func (n *LeafNode) Tuples() []*Tuple {
@@ -177,7 +184,7 @@ func (n *LeafNode) String() string {
 	return message
 }
 
-func (n *LeafNode) Update(newTuples []*Tuple, prevNodeID uint32, nextNodeID uint32) {
+func (n *LeafNode) Update(newTuples []*Tuple, prevNodeID PageID, nextNodeID PageID) {
 	n.tuples = newTuples
 	n.prevNodeID = prevNodeID
 	n.nextNodeID = nextNodeID
@@ -188,8 +195,8 @@ func (n *LeafNode) Update(newTuples []*Tuple, prevNodeID uint32, nextNodeID uint
 func (n *LeafNode) syncBytes() {
 	numTuples := uint32(len(n.tuples))
 	copy(n.page.body[LEAF_NODE_NUM_TUPLES_OFFSET:LEAF_NODE_NUM_TUPLES_OFFSET+LEAF_NODE_NUM_TUPLE_SIZE], convertUint32ToBytes(numTuples))
-	copy(n.page.body[LEAF_NODE_PREV_NODE_ID_OFFSET:LEAF_NODE_PREV_NODE_ID_OFFSET+LEAF_NODE_PREV_NODE_ID_SIZE], convertUint32ToBytes(n.prevNodeID))
-	copy(n.page.body[LEAF_NODE_NEXT_NODE_ID_OFFSET:LEAF_NODE_NEXT_NODE_ID_OFFSET+LEAF_NODE_NEXT_NODE_ID_SIZE], convertUint32ToBytes(n.nextNodeID))
+	copy(n.page.body[LEAF_NODE_PREV_NODE_ID_OFFSET:LEAF_NODE_PREV_NODE_ID_OFFSET+LEAF_NODE_PREV_NODE_ID_SIZE], convertPageIDToBytes(n.prevNodeID))
+	copy(n.page.body[LEAF_NODE_NEXT_NODE_ID_OFFSET:LEAF_NODE_NEXT_NODE_ID_OFFSET+LEAF_NODE_NEXT_NODE_ID_SIZE], convertPageIDToBytes(n.nextNodeID))
 
 	offset := LEAF_NODE_FIRST_CHILD_OFFSET
 	end := LEAF_NODE_FIRST_CHILD_OFFSET
@@ -214,14 +221,14 @@ func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 type BTree struct {
 	// Deprecated
 	rootNode            Node
-	rootNodeID          uint32
+	rootNodeID          PageID
 	capacityPerLeafNode int
 }
 
 type Noder interface {
-	Read(nodeId uint32) Node
+	Read(nodeId PageID) Node
 	NewLeafNode(tuples []*Tuple) *LeafNode
-	NewInternalNode(keys []uint32, children []uint32) *InternalNode
+	NewInternalNode(keys []uint32, children []PageID) *InternalNode
 }
 
 func (t *BTree) RootNode(noder Noder) Node {
@@ -246,11 +253,11 @@ func (t *BTree) String(noder Noder) string {
 	return message
 }
 
-func (t *BTree) getNode(nodeId uint32, noder Noder) Node {
+func (t *BTree) getNode(nodeId PageID, noder Noder) Node {
 	return noder.Read(nodeId)
 }
 
-func (t *BTree) newRoot(middleKey uint32, children []uint32, noder Noder) {
+func (t *BTree) newRoot(middleKey uint32, children []PageID, noder Noder) {
 	newRoot := noder.NewInternalNode([]uint32{middleKey}, children)
 	t.rootNode = newRoot
 	t.rootNodeID = newRoot.ID()
@@ -282,7 +289,7 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 		middleKey := newTuples[midIdx].key
 
 		if len(nodes) == 0 {
-			t.newRoot(middleKey, []uint32{leafNode.ID(), nodeID}, noder)
+			t.newRoot(middleKey, []PageID{leafNode.ID(), nodeID}, noder)
 
 		} else {
 			for i := len(nodes); i > 0; i-- {
@@ -294,7 +301,7 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 					middleKey = result.middleKey
 					nodeID = result.newNodeId
 					if t.RootNode(noder) == parentNode {
-						t.newRoot(middleKey, []uint32{parentNode.id, nodeID}, noder)
+						t.newRoot(middleKey, []PageID{parentNode.id, nodeID}, noder)
 					}
 				}
 			}
@@ -303,7 +310,7 @@ func (t *BTree) Insert(key uint32, value []byte, noder Noder) {
 
 }
 
-func (t *BTree) addChildrenToInternalNode(key uint32, nodeID uint32, internalNode *InternalNode, noder Noder) AddKeyResult {
+func (t *BTree) addChildrenToInternalNode(key uint32, nodeID PageID, internalNode *InternalNode, noder Noder) AddKeyResult {
 	idx := 0
 	for _, k := range internalNode.keys {
 		if key < k {
@@ -341,7 +348,7 @@ func (t *BTree) addChildrenToInternalNode(key uint32, nodeID uint32, internalNod
 type AddKeyResult struct {
 	splited   bool
 	middleKey uint32
-	newNodeId uint32
+	newNodeId PageID
 }
 
 func (t *BTree) Delete(key uint32) {
@@ -383,6 +390,7 @@ func (t *BTree) FindLeafNodeByCondition(key uint32, operator string, noder Noder
 	} else if operator == ">=" || operator == ">" {
 		nextNode := leafNode.NextNode(noder)
 		for idx == -1 && nextNode != nil {
+			fmt.Println(nextNode.ID())
 			for i, k := range nextNode.Keys() {
 				if compare(k, key, operator) {
 					leafNode = nextNode

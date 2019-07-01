@@ -35,12 +35,12 @@ func TestTxNoderReadInternalNode(t *testing.T) {
 	copy(page.body[0:2], pageTypeBytes)
 	internalNode := &InternalNode{
 		keys:     []uint32{},
-		children: []uint32{},
+		children: []PageID{},
 		page:     page,
 	}
 
 	keys := []uint32{5}
-	children := []uint32{4, 5}
+	children := []PageID{4, 5}
 	internalNode.Update(keys, children)
 	page0 := emptyPageBody()
 	pager := &DummyPager{body: append(page0[:], internalNode.page.body[:]...)}
@@ -48,12 +48,12 @@ func TestTxNoderReadInternalNode(t *testing.T) {
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
 	noder := &TransactionNoder{transaction: tx}
-	nodeID := uint32(1)
+	nodeID := PageID(1)
 
 	node := noder.Read(nodeID)
 
 	assert.Equal(t, "InternalNode", node.NodeType())
-	assert.Equal(t, uint32(1), node.ID())
+	assert.Equal(t, PageID(1), node.ID())
 	assert.Equal(t, keys, node.Keys())
 	assert.Equal(t, children, node.Children())
 }
@@ -77,12 +77,12 @@ func TestTxNoderReadLeafNode(t *testing.T) {
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
 	noder := &TransactionNoder{transaction: tx}
-	nodeID := uint32(1)
+	nodeID := PageID(1)
 
 	node := noder.Read(nodeID).(*LeafNode)
 
 	assert.Equal(t, "LeafNode", node.NodeType())
-	assert.Equal(t, uint32(1), node.ID())
+	assert.Equal(t, PageID(1), node.ID())
 	assert.Equal(t, tuples, node.tuples)
 }
 
@@ -99,7 +99,7 @@ func TestTxNoderNewLeafNode(t *testing.T) {
 
 	node := noder.NewLeafNode(tuples)
 
-	assert.Equal(t, uint32(1), node.ID())
+	assert.Equal(t, PageID(1), node.ID())
 	assert.Equal(t, tuples, node.tuples)
 }
 
@@ -111,11 +111,11 @@ func TestTxNoderNewInternalNode(t *testing.T) {
 	tx := NewTransaction(1, bufferPool)
 	noder := &TransactionNoder{transaction: tx}
 	keys := []uint32{5}
-	children := []uint32{4, 5}
+	children := []PageID{4, 5}
 
 	node := noder.NewInternalNode(keys, children)
 
-	assert.Equal(t, uint32(1), node.ID())
+	assert.Equal(t, PageID(1), node.ID())
 	assert.Equal(t, keys, node.keys)
 	assert.Equal(t, children, node.children)
 }

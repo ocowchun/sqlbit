@@ -7,33 +7,27 @@ import (
 )
 
 func TestReadPage(t *testing.T) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	page0 := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(page0[:], expectedPage[:]...)}
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
 
-	page, err := tx.ReadPage(uint32(1))
+	page, err := tx.ReadPage(PageID(1))
 
 	assert.Nil(t, err)
 	assert.Equal(t, expectedPage, *page.body)
 }
 
 func TestReadPageFromCache(t *testing.T) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	page0 := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(page0[:], expectedPage[:]...)}
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
-	pageID := uint32(1)
+	pageID := PageID(1)
 	tx.ReadPage(pageID)
 
 	page, err := tx.ReadPage(pageID)
@@ -44,10 +38,7 @@ func TestReadPageFromCache(t *testing.T) {
 }
 
 func TestTransactionNewPage(t *testing.T) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	page0 := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(page0[:], expectedPage[:]...)}
@@ -62,16 +53,13 @@ func TestTransactionNewPage(t *testing.T) {
 	assert.Equal(t, true, page.isDirty)
 }
 func TestTransactionCommit(t *testing.T) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	page0 := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(page0[:], expectedPage[:]...)}
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
-	pageID := uint32(1)
+	pageID := PageID(1)
 
 	page, err := tx.ReadPage(pageID)
 	page.body[0] = 100
@@ -85,16 +73,13 @@ func TestTransactionCommit(t *testing.T) {
 }
 
 func TestTransactionRollback(t *testing.T) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	page0 := emptyPageBody()
 	expectedPage := createPageFromSlice([]byte{1, 2, 3, 4, 5})
 	pager := &DummyPager{body: append(page0[:], expectedPage[:]...)}
 	bufferPool := NewBufferPool(replacer, pager, 5, 100)
 	tx := NewTransaction(1, bufferPool)
-	pageID := uint32(1)
+	pageID := PageID(1)
 
 	page, err := tx.ReadPage(pageID)
 	page.body[0] = 100

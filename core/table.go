@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -84,10 +85,7 @@ type Table struct {
 }
 
 func OpenTable(fileName string) (*Table, error) {
-	replacer := &DummyReplacer{
-		frameIndices: []uint32{},
-		pinnedIdxMap: make(map[uint32]bool),
-	}
+	replacer := NewDummyReplacer()
 	pager, err := NewFilePager(fileName)
 	if err != nil {
 		return nil, err
@@ -115,11 +113,11 @@ const TABLE_HEADER_ROOT_PAGE_NUM_SIZE = 4
 const TABLE_HEADER_HEADER_SIZE = PAGE_TYPE_SIZE + TABLE_HEADER_ROOT_PAGE_NUM_SIZE
 
 type TableHeader struct {
-	rootPageNum uint32
+	rootPageNum PageID
 }
 
 func readTableHeader(bufferPool *BufferPool) (*TableHeader, error) {
-	page, err := bufferPool.FetchPage(uint32(0))
+	page, err := bufferPool.FetchPage(PageID(0))
 
 	if err != nil {
 		return nil, err
@@ -132,7 +130,9 @@ func readTableHeader(bufferPool *BufferPool) (*TableHeader, error) {
 	}
 	from := PAGE_TYPE_SIZE
 	bs = page[from : from+TABLE_HEADER_ROOT_PAGE_NUM_SIZE]
-	rootPageNum := binary.LittleEndian.Uint32(bs)
+	var rootPageNum PageID
+	binary.Read(bytes.NewReader(bs), binary.LittleEndian, &rootPageNum)
+
 	return &TableHeader{rootPageNum: rootPageNum}, nil
 }
 

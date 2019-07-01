@@ -11,14 +11,14 @@ func (tp *transactionPage) isDirty() bool {
 
 type Transaction struct {
 	id         int32
-	pageTable  map[uint32]*transactionPage
+	pageTable  map[PageID]*transactionPage
 	bufferPool *BufferPool
 }
 
 func NewTransaction(id int32, bufferPool *BufferPool) *Transaction {
 	return &Transaction{
 		id:         id,
-		pageTable:  make(map[uint32]*transactionPage),
+		pageTable:  make(map[PageID]*transactionPage),
 		bufferPool: bufferPool,
 	}
 }
@@ -36,7 +36,7 @@ func EmptySnapshotPage() *Page {
 	}
 }
 
-func (t *Transaction) ReadPage(pageID uint32) (*Page, error) {
+func (t *Transaction) ReadPage(pageID PageID) (*Page, error) {
 	if t.pageTable[pageID] == nil {
 		page, err := t.bufferPool.FetchPage(pageID)
 		if err != nil {

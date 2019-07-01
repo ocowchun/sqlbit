@@ -105,10 +105,10 @@ func (p *FilePager) Write(offset int64, bs *PageBody) error {
 	return w.Flush()
 }
 
-func (p *FilePager) IncrementPageID() uint32 {
+func (p *FilePager) IncrementPageID() PageID {
 	id := atomic.AddInt64(&p.numPages, 1)
 	// TODO: avoid id > max uint32
-	return uint32(id)
+	return PageID(id)
 }
 
 func (p *FilePager) Close() error {
