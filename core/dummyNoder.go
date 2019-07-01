@@ -18,7 +18,7 @@ func (n *DummyNoder) add(node Node) uint32 {
 func (n *DummyNoder) NewLeafNode(tuples []*Tuple) *LeafNode {
 	page := EmptyPage()
 	node := &LeafNode{
-		tuples: tuples,
+		tuples: append([]*Tuple(nil), tuples...),
 		page:   page,
 	}
 	id := n.add(node)

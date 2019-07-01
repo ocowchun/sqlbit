@@ -152,7 +152,7 @@ func (n *LeafNode) Children() []uint32 {
 }
 
 func (n *LeafNode) Tuples() []*Tuple {
-	return n.tuples
+	return append([]*Tuple(nil), n.tuples...)
 }
 
 func (n *LeafNode) Keys() []uint32 {
