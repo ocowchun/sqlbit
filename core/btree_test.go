@@ -66,6 +66,10 @@ func TestLeafNodeUpdate(t *testing.T) {
 }
 
 func createDummyBtree() (*BTree, *DummyNoder) {
+	return createDummyBtreeWithParams(2)
+}
+
+func createDummyBtreeWithParams(capacityPerLeafNode int) (*BTree, *DummyNoder) {
 	page := EmptyPage()
 	rootNode := &LeafNode{
 		id:         0,
@@ -79,7 +83,7 @@ func createDummyBtree() (*BTree, *DummyNoder) {
 	}
 	tree := &BTree{
 		rootNodeID:          0,
-		capacityPerLeafNode: 2,
+		capacityPerLeafNode: capacityPerLeafNode,
 	}
 	return tree, noder
 }
@@ -97,10 +101,10 @@ func TestBtreeInsert(t *testing.T) {
 	tree.Insert(8, []byte("i"), noder)
 	tree.Insert(9, []byte("j"), noder)
 
-	newRootNode := tree.RootNode(noder)
+	newRootNode := tree.RootNode(noder).(*InternalNode)
 	assert.Equal(t, newRootNode.Keys(), []uint32{5})
-	assert.Equal(t, tree.getNode(newRootNode.Children()[0], noder).Keys(), []uint32{3})
-	assert.Equal(t, tree.getNode(newRootNode.Children()[1], noder).Keys(), []uint32{7})
+	assert.Equal(t, tree.getNode(newRootNode.PageIDs()[0], noder).Keys(), []uint32{3})
+	assert.Equal(t, tree.getNode(newRootNode.PageIDs()[1], noder).Keys(), []uint32{7})
 	for i := 0; i < 9; i++ {
 		assert.NotNil(t, tree.Find(uint32(i+1), noder), noder)
 	}
@@ -188,4 +192,84 @@ func TestFindLeafNodeByCondition(t *testing.T) {
 
 	_, idx = tree.FindLeafNodeByCondition(uint32(1), "<", noder)
 	assert.Equal(t, -1, idx)
+}
+
+func TestBtreeDelete(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(2, []byte("b"), noder)
+	tree.Insert(3, []byte("c"), noder)
+	tree.Insert(4, []byte("d"), noder)
+
+	tree.Delete(uint32(3), noder)
+
+	rootNode := tree.RootNode(noder)
+	assert.Equal(t, []uint32{2, 4}, rootNode.Keys())
+}
+
+// redistribute from prevNode
+func TestBtreeDeleteCase1(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(5, []byte("b"), noder)
+	tree.Insert(4, []byte("c"), noder)
+	tree.Insert(3, []byte("d"), noder)
+	tree.Insert(2, []byte("3"), noder)
+
+	tree.Delete(uint32(4), noder)
+	tree.Delete(uint32(5), noder)
+
+	rootNode := tree.RootNode(noder)
+	assert.Equal(t, []uint32{2, 3}, rootNode.Keys())
+}
+
+// redistribute from nextNode
+func TestBtreeDeleteCase2(t *testing.T) {
+	tree, noder := createDummyBtree()
+	tree.Insert(1, []byte("a"), noder)
+	tree.Insert(5, []byte("b"), noder)
+	tree.Insert(4, []byte("c"), noder)
+	tree.Insert(3, []byte("d"), noder)
+	tree.Insert(2, []byte("3"), noder)
+
+	tree.Delete(uint32(1), noder)
+
+	rootNode := tree.RootNode(noder)
+	assert.Equal(t, []uint32{3, 4}, rootNode.Keys())
+}
+
+// merge prev node
+func TestBtreeDeleteCase3(t *testing.T) {
+	tree, noder := createDummyBtreeWithParams(4)
+	tree.Insert(1, []byte("1"), noder)
+	tree.Insert(2, []byte("2"), noder)
+	tree.Insert(3, []byte("3"), noder)
+	tree.Insert(4, []byte("4"), noder)
+	tree.Insert(5, []byte("5"), noder)
+	tree.Insert(6, []byte("6"), noder)
+	tree.Insert(7, []byte("7"), noder)
+
+	tree.Delete(uint32(5), noder)
+	tree.Delete(uint32(6), noder)
+
+	rootNode := tree.RootNode(noder)
+	assert.Equal(t, []uint32{3}, rootNode.Keys())
+}
+
+// merge next node
+func TestBtreeDeleteCase4(t *testing.T) {
+	tree, noder := createDummyBtreeWithParams(5)
+	tree.Insert(1, []byte("1"), noder)
+	tree.Insert(2, []byte("2"), noder)
+	tree.Insert(3, []byte("3"), noder)
+	tree.Insert(4, []byte("4"), noder)
+	tree.Insert(5, []byte("5"), noder)
+	tree.Insert(5, []byte("6"), noder)
+	tree.Insert(5, []byte("7"), noder)
+
+	tree.Delete(uint32(5), noder)
+	tree.Delete(uint32(6), noder)
+
+	rootNode := tree.RootNode(noder)
+	assert.Equal(t, rootNode.Keys(), []uint32{3})
 }

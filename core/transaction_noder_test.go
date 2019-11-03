@@ -55,7 +55,7 @@ func TestTxNoderReadInternalNode(t *testing.T) {
 	assert.Equal(t, "InternalNode", node.NodeType())
 	assert.Equal(t, PageID(1), node.ID())
 	assert.Equal(t, keys, node.Keys())
-	assert.Equal(t, children, node.Children())
+	assert.Equal(t, children, node.(*InternalNode).PageIDs())
 }
 
 func TestTxNoderReadLeafNode(t *testing.T) {
